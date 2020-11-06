@@ -17,13 +17,12 @@ except for cautious use.
 
 So far there is support for iResolution, iTime and (partially) iMouse via uniforms
 
-Some what related:
+Demo: https://luckybit4755.github.io/shady-lady/html/simple-spheres.html
+
+Somewhat related:
 
 * https://github.com/SebastienGravel/ShaderToyTouchdesigner
 * https://nvoid.gitbooks.io/introduction-to-touchdesigner/content/GLSL/12-6-Importing-Shadertoy.html
 
-Unrelated:
-
-![alt text](https://www.398th.org/Images/Images_Aircraft_B-17/Images/42-97385_3O-X_SHADY_LADY.jpg "
-/src/of/image.jpg "title")
+Unrelated: https://www.398th.org/Images/Images_Aircraft_B-17/Images/42-97385_3O-X_SHADY_LADY.jpg 
 
