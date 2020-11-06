@@ -2,12 +2,12 @@ Had a lot of fun on https://www.shadertoy.com/ and wanted to try to do some stuf
 
 The goal was to have minimal html and javascript boilerplate:
 
-<HTML>
-	<HEAD>
-		<script type="text/javascript" src="../js/throw-shade.js"></script>
-	</HEAD>
-	<BODY></BODY>
-</HTML>
+	<HTML>
+		<HEAD>
+			<script type="text/javascript" src="../js/throw-shade.js"></script>
+		</HEAD>
+		<BODY></BODY>
+	</HTML>
 
 This is the contents of a simple-spheres.html, based on which, it picks up the shader 
 ../glsl/fragment/simple-spheres.frag 
