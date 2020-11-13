@@ -6,6 +6,13 @@ uniform vec2 u_resolution;
 #define CYAN   vec3( 0.0, 1.0, 1.0 )
 #define BLUE   vec3( 0.0, 0.0, 1.0 )
 
+vec2 floor_step( vec2 a, vec2 b ) {
+	return vec2(
+		floor( a.x - b.x ),
+		floor( a.y - b.y )
+	);
+}
+
 float rectangle( vec2 position, vec2 size, vec2 current ) {
 	vec2 tmp;
 	float f = 1.0;
