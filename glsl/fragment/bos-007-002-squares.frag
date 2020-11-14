@@ -1,10 +1,11 @@
 uniform vec2 u_resolution;
 
-#define RED    vec3( 1.0, 0.0, 0.0 )
-#define YELLOW vec3( 1.0, 1.0, 0.0 )
+#define RED    vec3( 0.64, 0.0, 0.0 )
+#define YELLOW vec3( 1.0, 0.75, 0.0 )
 #define GREEN  vec3( 0.0, 1.0, 0.0 )
 #define CYAN   vec3( 0.0, 1.0, 1.0 )
-#define BLUE   vec3( 0.0, 0.0, 1.0 )
+#define BLUE   vec3( 0.3, 0.3, 1.0 )
+#define WHITE  vec3( 1.0, 1.0, 1.0 )
 
 vec2 floor_step( vec2 a, vec2 b ) {
 	return vec2(
@@ -45,9 +46,43 @@ void main(){
 	vec2 st = gl_FragCoord.xy/u_resolution.xy;
 	vec3 color = vec3(0.0);
 
-	color += RED    * rectangle( vec2( 0.1, 0.1 ), vec2( 0.8, 0.5 ), st );
-	color += YELLOW * rectangle( vec2( 0.4, 0.4 ), vec2( 0.2, 0.4 ), st );
-	color += GREEN  * frame(    vec2( 0.12, 0.7 ), vec2( 0.1, 0.2 ), vec2( 0.01 ), st );
+	// Mondrian
+
+	// top row
+	float gap_y = 0.027;
+	float gap_x = 0.035;
+
+	float y = 0.838;
+	float h = 0.162;
+
+	color += RED    * rectangle( vec2( 0.000, y ), vec2( 0.070, h ), st );
+	color += RED    * rectangle( vec2( 0.090, y ), vec2( 0.100, h ), st );
+	color += WHITE  * rectangle( vec2( 0.210, y ), vec2( 0.420, h ), st );
+	color += WHITE  * rectangle( vec2( 0.655, y ), vec2( 0.160, h ), st );
+	color += YELLOW * rectangle( vec2( 0.835, y ), vec2( 0.160, h ), st );
+
+	y -= h + gap_y;
+	color += RED    * rectangle( vec2( 0.000, y ), vec2( 0.070, h ), st );
+	color += RED    * rectangle( vec2( 0.090, y ), vec2( 0.100, h ), st );
+	color += WHITE  * rectangle( vec2( 0.210, y ), vec2( 0.420, h ), st );
+	color += WHITE  * rectangle( vec2( 0.655, y ), vec2( 0.160, h ), st );
+	color += YELLOW * rectangle( vec2( 0.835, y ), vec2( 0.160, h ), st );
+
+	h = 0.524;
+	y -= h + gap_y + 0.002;
+	color += WHITE  * rectangle( vec2( 0.210, y ), vec2( 0.420, h ), st );
+	color += WHITE  * rectangle( vec2( 0.655, y ), vec2( 0.160, h ), st );
+	color += WHITE  * rectangle( vec2( 0.835, y ), vec2( 0.160, h ), st );
+
+	h = y - gap_y + 0.008;
+	y = 0.0;	
+	color += WHITE  * rectangle( vec2( 0.210, y ), vec2( 0.420, h ), st );
+	color += BLUE   * rectangle( vec2( 0.655, y ), vec2( 0.160, h ), st );
+	color += BLUE   * rectangle( vec2( 0.835, y ), vec2( 0.160, h ), st );
+
+	h = 0.620;
+	color += WHITE  * rectangle( vec2( 0.000, y ), vec2( 0.190, h ), st );
+
 
 	gl_FragColor = vec4(color,1.0);
 }
