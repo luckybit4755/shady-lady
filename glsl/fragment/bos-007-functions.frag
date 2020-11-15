@@ -1,6 +1,10 @@
 uniform vec2 u_resolution;
 uniform float u_time;
 
+#define PI      3.14159265359
+#define TWO_PI  (2.0*3.14159265359)
+
+
 #define RED    vec3( 0.64, 0.0, 0.0 )
 #define YELLOW vec3( 1.0, 0.75, 0.0 )
 #define GREEN  vec3( 0.0, 1.0, 0.0 )
@@ -72,6 +76,20 @@ float makeFlower( vec2 center, float inner, float outer, float angle, float peta
 	return 1.0 - smoothstep( f, f + 0.02, r );
 }
 
+float makePolygon( vec2 center, float radius, float angle, float sides, vec2 current ) {
+	vec2 polar = toPolar( center, current );
+
+	vec2 diff = center - current;
+	float a = atan( diff.x, diff.y ) + angle;
+	float r = length( diff );
+
+	float q = TWO_PI / floor( sides );
+	float d = cos(floor(.5+a/q)*q-a) * r;
+
+	radius *= sides * 0.1; // idk...
+	return 1.0 - smoothstep( radius, radius + 0.01, d );
+}
+
 vec2 addShape( vec2 accumulator, float value ) {
 	return vec2(
 		value * accumulator.y, 
@@ -102,6 +120,13 @@ void main(){
 
 	accumulator = addShape( accumulator, makeGear( vec2( 0.2 ), 0.15, 0.05, u_time, 12., 0.04, st ) );
 	color += CYAN * accumulator.x;
+
+	float sides = 3.0 + abs( cos( u_time ) ) * 5.0;
+	accumulator = addShape( accumulator, makePolygon( vec2( 0.2, 0.8 ), 0.1, u_time, sides, st ) );
+	color += BLUE * accumulator.x;
+
+	accumulator = addShape( accumulator, makeCircle( vec2( 0.2, 0.8 ), 0.1, st ) );
+	color += GREEN * accumulator.x;
 
 	gl_FragColor = vec4( color, 1.0 );
 }
