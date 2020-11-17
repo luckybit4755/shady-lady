@@ -77,8 +77,6 @@ float makeFlower( vec2 center, float inner, float outer, float angle, float peta
 }
 
 float makePolygon( vec2 center, float radius, float angle, float sides, vec2 current ) {
-	vec2 polar = toPolar( center, current );
-
 	vec2 diff = center - current;
 	float a = atan( diff.x, diff.y ) + angle;
 	float r = length( diff );
@@ -88,6 +86,12 @@ float makePolygon( vec2 center, float radius, float angle, float sides, vec2 cur
 
 	radius *= sides * 0.1; // idk...
 	return 1.0 - smoothstep( radius, radius + 0.01, d );
+}
+
+float makeSpokes( vec2 center, float radius, float spokes, vec2 current ) {
+	vec2 polar = toPolar( center, current );
+	float r = radius + 2.0 * cos( spokes * polar.y  );
+	return step( 1.0, r - polar.x * 6.6 );
 }
 
 vec2 addShape( vec2 accumulator, float value ) {
@@ -127,6 +131,10 @@ void main(){
 
 	accumulator = addShape( accumulator, makeCircle( vec2( 0.2, 0.8 ), 0.1, st ) );
 	color += GREEN * accumulator.x;
+
+	float spokes = 2.0 + abs( sin( u_time ) ) * 5.0;
+	accumulator = addShape( accumulator, makeSpokes( vec2( 0.2, 0.5 ), 0.08, spokes, st ) );
+	color += WHITE * accumulator.x;
 
 	gl_FragColor = vec4( color, 1.0 );
 }
