@@ -8,7 +8,7 @@ uniform float u_time;
 
 float circle( in vec2 xy ) {
     xy -= vec2( 0.5 );
-    return step( 0.5 * 0.5 * 0.77, dot( xy, xy ) );
+    return step( 0.5 * 0.5 * 0.66, dot( xy, xy ) );
 }
 
 float saltire( in vec2 xy ) {
@@ -48,15 +48,15 @@ float gt( int i, float value ) {
 	return step( float( i ), value );
 }
 
-float ttt( in vec2 st, in vec2 xy ) {
+vec3 ttt( in vec2 st, in vec2 xy ) {
 	// where are we?
 	float row = floor( st.x * 3. ); // 0-3
 	float col = floor( st.y * 3. ); // 0-3
 	float idx = 3. * col + row; // 0 - 8
-
 	// create the shapes
 	float z = 0.0;
-	float o = 1.0 - circle( xy ) -(1.- circle( 2. * xy  - 0.5 ));
+
+	float o = circle( 2. * xy  - 0.5 ) - circle( xy );
 	float x = 1.0 - saltire( xy );
 
 	float f = 0.;
@@ -72,6 +72,10 @@ float ttt( in vec2 st, in vec2 xy ) {
 	vec3 row2 = vec3( x, x, o ); // 3,4,5
 	vec3 row1 = vec3( o, x, x ); // 0,1,2
 
+	vec3 red1 = vec3( 0., 1., 1. );
+	vec3 red2 = vec3( 1., 1., 0. );
+	vec3 red3 = vec3( 0., 0., 1. );
+
 	// which cell is drawn here?
 	int i = 0;
 	vec3 hot1 = vec3( eq( i++, idx ), eq( i++, idx ), eq( i++, idx ) );
@@ -80,19 +84,24 @@ float ttt( in vec2 st, in vec2 xy ) {
 
 	// draw the board
 
-	f += move1.x * hot1.x * row1.x;
-	f += move1.y * hot1.y * row1.y;
-	f += move1.z * hot1.z * row1.z;
+	vec3 red = vec3( 1., 0., 0. );
+	vec3 grn = vec3( 0., 1., 0. );
 
-	f += move2.x * hot2.x * row2.x;
-	f += move2.y * hot2.y * row2.y;
-	f += move2.z * hot2.z * row2.z;
+	vec3 color = vec3( 0. );
 
-	f += move3.x * hot3.x * row3.x;
-	f += move3.y * hot3.y * row3.y;
-	f += move3.z * hot3.z * row3.z;
+	color += move1.x * hot1.x * row1.x * ( red * red1.x + grn * ( 1. - red1.x ) );
+	color += move1.y * hot1.y * row1.y * ( red * red1.y + grn * ( 1. - red1.y ) );
+	color += move1.z * hot1.z * row1.z * ( red * red1.z + grn * ( 1. - red1.z ) );
 
-	return f;
+	color += move2.x * hot2.x * row2.x * ( red * red2.x + grn * ( 1. - red2.x ) );
+	color += move2.y * hot2.y * row2.y * ( red * red2.y + grn * ( 1. - red2.y ) );
+	color += move2.z * hot2.z * row2.z * ( red * red2.z + grn * ( 1. - red2.z ) );
+
+	color += move3.x * hot3.x * row3.x * ( red * red3.x + grn * ( 1. - red3.x ) );
+	color += move3.y * hot3.y * row3.y * ( red * red3.y + grn * ( 1. - red3.y ) );
+	color += move3.z * hot3.z * row3.z * ( red * red3.z + grn * ( 1. - red3.z ) );
+
+	return color;
 }
 
 void main() {
