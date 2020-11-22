@@ -40,7 +40,7 @@ float cutOut( float f, int count, float offset, float distance, vec2 xy ) {
 	return f * min( q1, q2 );
 }
 
-float line( vec2 start, vec2 stop, float thickness, vec2 xy ) {
+float line_( vec2 start, vec2 stop, float thickness, vec2 xy ) {
 	// https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line#Vector_formulation
 	vec2 n = normalize( stop - start );
 	vec2 q = start - xy;
@@ -115,12 +115,12 @@ vec3 hud( vec2 xy ) {
 
 	// static lines
 
-	float line = 0.009;
+	float len = 0.009;
 	float thickness = 0.0000001;
 	float inside = ring( vec3( 0.0, 0.478, 0.0 ), xy );
 
-	color += gray * inside * line( vec2( -line, + line ), vec2( +line, -line ), thickness, xy );
-	color += gray * inside * line( vec2( +line, + line ), vec2( -line, -line ), thickness, xy );
+	color += gray * inside * line_( vec2( -len, + len ), vec2( +len, -len ), thickness, xy );
+	color += gray * inside * line_( vec2( +len, + len ), vec2( -len, -len ), thickness, xy );
 
 	// orange thing
 

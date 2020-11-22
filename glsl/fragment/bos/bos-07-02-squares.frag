@@ -1,3 +1,7 @@
+#ifdef GL_ES
+precision mediump float;
+#endif
+
 uniform vec2 u_resolution;
 
 #define RED    vec3( 0.64, 0.0, 0.0 )
