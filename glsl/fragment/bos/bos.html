@@ -1,0 +1,193 @@
+<HTML>
+	<HEAD>
+		<TITLE>bos</TITLE>
+		<script type="text/javascript">
+			const SIZE = 256;
+			const COLS = 99;
+			const ROWS = 22;
+			const FPS  = 33;
+
+			window.onload = function() {
+				//document.body.onclick = () => { window.location.reload( true ) }
+				ajaxFragmentList( loadFragments );
+			};
+
+			const ajaxFragmentList = ( listHandler ) => {
+				let url = dirname( document.location.toString() );
+				ajaxtomistic( url, ( err, txt ) => {
+					if ( err ) throw err;
+					let parser = new DOMParser();
+					let doc = parser.parseFromString( txt, 'text/html' );
+					let frags = [];
+					let az = doc.getElementsByTagName( 'a' );
+					for ( let i = 0 ; i < az.length ; i++ ) {
+						let a = az[ i ];
+						if ( /\.frag$/.test( a.href ) ) {
+							frags.push( a.href );
+						}
+					}
+					listHandler( frags.sort().reverse() );
+				} );
+			};
+
+			const loadFragments = ( urls ) => {
+				if ( urls.length ) {
+					loadFragment( urls.pop( urls ), urls );
+				}
+			};
+
+			const loadFragment = ( url, urls ) => { 
+				ajaxtomistic( url, ( err, txt ) => {
+					addFragment( url, txt );
+					loadFragments( urls );
+				});
+			};
+
+			const addFragment = ( url, fragment ) => {
+				let name        = basename( url );
+				let parts       = name.split( '-' );
+				let chapter     = parseInt( parseInt( parts[ 1 ] ) );
+				let exercise    = parseInt( parseInt( parts[ 2 ] ) );
+				let description = name.replace( /^bos-[0-9]*-[0-9]*-/, '' ).replace( /\.frag$/, '' );
+				let title       = 'Chapter X, exercise #X: X'
+					.replace( /X/, chapter )
+					.replace( /X/, exercise )
+					.replace( /X/, description )
+				;
+
+				let section = document.createElement( 'div' );
+				document.body.appendChild( section );
+				let h3 = document.createElement( 'h3' );
+				section.appendChild( h3 );
+				h3.appendChild( document.createTextNode( title ) );
+
+				let canvas = document.createElement( 'canvas' );
+				canvas.width = canvas.height = SIZE;
+				section.appendChild( canvas );
+
+				let button = document.createElement( 'button' );
+				button.appendChild( document.createTextNode( '<--') );
+				section.appendChild( button );
+
+				let textarea = document.createElement( 'textarea' );
+				textarea.setAttribute( 'rows', ROWS );
+				textarea.setAttribute( 'cols', COLS );
+				textarea.innerHTML = fragment;
+				section.appendChild( textarea );
+
+				let gl = canvas.getContext( 'webgl' );
+				let program = false;
+				let uz = false;
+
+				let u_time = 0;
+				let delay = 1000 / FPS;
+
+				let draw = function() {
+					u_time += FPS / 1000.0;
+					gl.uniform1f( uz.u_time, u_time );
+					gl.uniform2f( uz.u_resolution, canvas.width, canvas.height );
+					gl.drawArrays( gl.TRIANGLES, 0,  3 );
+					setTimeout(
+						() => { window.requestAnimationFrame( draw ) }
+						, 1000 / FPS
+					);
+				};
+
+				button.onclick = function() {
+					let gled = glIt( gl, vertexShaderSource, textarea.value );
+					program = gled.program;
+					uz = gled.uz;
+					draw();
+				};
+			};
+
+			const glIt = ( gl, vertexShaderSource, fragmentShaderSource ) => {
+				let vertex_shader = gl.createShader( gl.VERTEX_SHADER );
+				gl.shaderSource( vertex_shader, vertexShaderSource, );
+				gl.compileShader( vertex_shader );
+				console.log( gl.getShaderInfoLog( vertex_shader ));
+
+				let fragment_shader = gl.createShader( gl.FRAGMENT_SHADER );
+				gl.shaderSource( fragment_shader, fragmentShaderSource );
+				gl.compileShader( fragment_shader );
+				console.log( gl.getShaderInfoLog( fragment_shader ));
+
+				let program = gl.createProgram();
+				gl.attachShader( program, vertex_shader );
+				gl.attachShader( program, fragment_shader );
+				gl.linkProgram( program );
+				gl.useProgram( program );
+
+				let vertex_buf = gl.createBuffer( gl.ARRAY_BUFFER );
+				gl.bindBuffer( gl.ARRAY_BUFFER, vertex_buf );
+				gl.bufferData( gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW );
+
+				let position_attrib_location = gl.getAttribLocation( program, "aPosition");
+				gl.enableVertexAttribArray( position_attrib_location );
+				gl.vertexAttribPointer( position_attrib_location, 2, gl.FLOAT, false, 0, 0);
+
+				let uz = {};
+				'u_resolution u_time'.split( ' ' ).forEach( v=>{ uz[ v ] = gl.getUniformLocation( program, v ) });
+				return { program:program, uz:uz };
+			}
+
+			const vertexShaderSource = `
+				precision highp float;
+				attribute vec4 aPosition;
+				void main() {
+					gl_Position = aPosition;
+				}
+			`;
+
+			const ajaxtomistic = ( url, callback ) => {
+				let xhttp = new XMLHttpRequest();
+				xhttp.onreadystatechange = function() {
+					//console.log( this.readyState, this.status );
+					if ( this.readyState == 4 && this.status == 200) {
+						callback( null, this.responseText );
+					}
+				}
+				url += '?cb=' + uuidv4();
+				xhttp.open( 'GET', url, true );
+				xhttp.send();
+			};
+
+
+			// 0.04
+
+			// randomUUID
+			const uuidv4 = () => {
+			  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+				var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+				return v.toString(16);
+			  });
+			}
+
+			const dirname = ( url ) => {
+				return url.replace( /\/[^\/]*$/, '' );
+			};
+
+			const basename = ( url ) => {
+				return url.replace( /.*\//, '' );
+			};
+		</script>
+
+		<style>
+			body {
+				font-family: sans-serif;
+			}
+			canvas {
+				border: 1px solid black;
+			}
+			textarea {
+				font-family: "Lucida Console", Monaco, monospace;
+				background:black;
+				color: #6F6;
+				font-weight: bold;
+				font-size:10px;
+			}
+		</style>
+	</HEAD>
+	<BODY>
+	</BODY>
+</HTML>
