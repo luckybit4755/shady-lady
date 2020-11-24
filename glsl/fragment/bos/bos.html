@@ -8,12 +8,16 @@
 			const FPS  = 33;
 
 			window.onload = function() {
-				//document.body.onclick = () => { window.location.reload( true ) }
-				ajaxFragmentList( loadFragments );
+				if ( -1 == document.location.hostname.indexOf( 'github.io' ) ) {
+					ajaxFragmentList( loadFragments );
+				} else {
+					staticLoad();
+				}
 			};
 
 			const ajaxFragmentList = ( listHandler ) => {
 				let url = dirname( document.location.toString() );
+				console.log( document.location );
 				ajaxtomistic( url, ( err, txt ) => {
 					if ( err ) throw err;
 					let parser = new DOMParser();
@@ -26,7 +30,13 @@
 							frags.push( a.href );
 						}
 					}
-					listHandler( frags.sort().reverse() );
+					frags = frags.sort();
+
+					if ( -1 != document.location.search.indexOf( 'last' ) ) {
+						frags = [ frags[ frags.length - 1 ] ];
+					}
+
+					listHandler( frags );
 				} );
 			};
 
@@ -49,17 +59,24 @@
 				let chapter     = parseInt( parseInt( parts[ 1 ] ) );
 				let exercise    = parseInt( parseInt( parts[ 2 ] ) );
 				let description = name.replace( /^bos-[0-9]*-[0-9]*-/, '' ).replace( /\.frag$/, '' );
-				let title       = 'Chapter X, exercise #X: X'
-					.replace( /X/, chapter )
+				let title       = 'Book of Shadows Chapter ' + chapter;
+				let detail      = 'exercise #X: X'
 					.replace( /X/, exercise )
 					.replace( /X/, description )
 				;
 
 				let section = document.createElement( 'div' );
 				document.body.appendChild( section );
+
 				let h3 = document.createElement( 'h3' );
 				section.appendChild( h3 );
-				h3.appendChild( document.createTextNode( title ) );
+				let a = document.createElement( 'a' );
+				a.href = 'https://thebookofshaders.com/' + parts[ 1 ] + '/';
+				a.appendChild( document.createTextNode( title ) );
+				h3.appendChild( a );
+				h3.appendChild( document.createTextNode( ', ' + detail ) );
+
+
 
 				let canvas = document.createElement( 'canvas' );
 				canvas.width = canvas.height = SIZE;
@@ -170,11 +187,21 @@
 			const basename = ( url ) => {
 				return url.replace( /.*\//, '' );
 			};
+
+					
+			const staticLoad = () => {
+				let files = 'bos-06-01-emo-fade.frag bos-06-02-painting.frag bos-07-01-square.frag bos-07-02-squares.frag bos-07-03-odd-circle.frag bos-07-04-distance-field.frag bos-07-05-functions.frag bos-08-01-functions.frag bos-08-02-hud.frag bos-09-01-circle-tile.frag bos-09-02-tic-tac-toe.frag bos-09-03-tiles.frag bos-09-04-tartan.frag bos-09-05-offsets.frag';
+				// ls *.frag | sort -n | tr '\n' ' '
+
+				loadFragments( files.split( ' ' ) );
+			}
 		</script>
 
 		<style>
 			body {
 				font-family: sans-serif;
+				background: #200;
+				color: #da4;
 			}
 			canvas {
 				border: 1px solid black;
@@ -185,6 +212,10 @@
 				color: #6F6;
 				font-weight: bold;
 				font-size:10px;
+			}
+			a {
+				color: #fc6;
+				text-decoration: none;
 			}
 		</style>
 	</HEAD>
