@@ -76,21 +76,20 @@
 				h3.appendChild( a );
 				h3.appendChild( document.createTextNode( ', ' + detail ) );
 
-
-
-				let canvas = document.createElement( 'canvas' );
-				canvas.width = canvas.height = SIZE;
-				section.appendChild( canvas );
-
-				let button = document.createElement( 'button' );
-				button.appendChild( document.createTextNode( '<--') );
-				section.appendChild( button );
-
 				let textarea = document.createElement( 'textarea' );
 				textarea.setAttribute( 'rows', ROWS );
 				textarea.setAttribute( 'cols', COLS );
 				textarea.innerHTML = fragment;
 				section.appendChild( textarea );
+
+				let button = document.createElement( 'button' );
+				// 261E (glyph is lame)
+				button.appendChild( document.createTextNode( '\u27A9' ) );
+				section.appendChild( button );
+
+				let canvas = document.createElement( 'canvas' );
+				canvas.width = canvas.height = SIZE;
+				section.appendChild( canvas );
 
 				let gl = canvas.getContext( 'webgl' );
 				let program = false;
@@ -204,7 +203,7 @@
 				color: #da4;
 			}
 			canvas {
-				border: 1px solid black;
+				border: 1px dashed #444;
 			}
 			textarea {
 				font-family: "Lucida Console", Monaco, monospace;
@@ -216,6 +215,19 @@
 			a {
 				color: #fc6;
 				text-decoration: none;
+			}
+			ffsk_button {
+				vertical-align:middle;
+				text-align:middle;
+				display:inline;
+			}
+			button {
+				position:relative;
+				top:-128px;
+				font-size:22px;
+				background: #200;
+				color: #da4;
+				border:0px;
 			}
 		</style>
 	</HEAD>
