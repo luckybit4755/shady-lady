@@ -2,7 +2,7 @@
 
 _makeIndex_main() {
 	ls *.frag \
-	| sort -n 
+	| sort -n \
 	| awk '
 		BEGIN {
 			print "<HTML><BODY><UL>"
