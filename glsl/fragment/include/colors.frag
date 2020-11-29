@@ -146,3 +146,7 @@
 #define COLOR_WHITESMOKE           vec3( 0.9608, 0.9608, 0.9608 )
 #define COLOR_YELLOW               vec3( 1.0000, 1.0000, 0.0000 )
 #define COLOR_YELLOWGREEN          vec3( 0.6039, 0.8039, 0.1961 )
+
+vec3 rgb( in int r, in int g, in int b ) {
+	return vec3( float( r ) / 255., float( g ) / 255., float( b ) / 255. );
+}
