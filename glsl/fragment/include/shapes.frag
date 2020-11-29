@@ -59,6 +59,8 @@ float makeSpokes( in float radius, in float spokes, in vec2 current ) {
 	return step( 1.0, r - polar.x * 6.6 );
 }
 
+// initially: vec2 accumulator = vec2( 1.0 );
+// usage: accumulator = addShape( accumulator, f ); color += RED * accumulator.x;
 vec2 addShape( in vec2 accumulator, in float value ) {
 	return vec2(
 		value * accumulator.y, 
