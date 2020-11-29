@@ -29,15 +29,15 @@ float weird( in vec2 st ) {
 
 	vec2 u = smoothstep(0.,1.,f);
 
-	vec2 d_a = f - A;
-	vec2 d_b = f - B;
-	vec2 d_c = f - C;
-	vec2 d_d = f - D;
+	vec2 d_a = u - A;
+	vec2 d_b = u - B;
+	vec2 d_c = u - C;
+	vec2 d_d = u - D;
 
-	float w_a = 1.-dot( d_a, d_a );
-	float w_b = 1.-dot( d_b, d_b );
-	float w_c = 1.-dot( d_c, d_c );
-	float w_d = 1.-dot( d_d, d_d );
+	float w_a = d_a.x * d_a.y * 0.999 + 0.001;
+	float w_b = d_b.x * d_b.y * 0.999 + 0.001;
+	float w_c = d_c.x * d_c.y * 0.999 + 0.001;
+	float w_d = d_d.x * d_d.y * 0.999 + 0.001;
 
 	float q = 0.;
 	q += a / w_a;
