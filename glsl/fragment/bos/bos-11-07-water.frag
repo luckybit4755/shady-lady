@@ -129,7 +129,7 @@ void main() {
 	//color += blue * lines( st, 8. , thickness );
 	//color += blue * lines( st, 8. * noise( 99.*st + u_time ), thickness );
 
-	int count = 8;
+	const int count = 8;
 	for ( int i = 0 ; i < count ; i++ ) {
 		break;
 		float xo = 1.80 * float( i ) / float( count );

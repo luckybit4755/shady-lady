@@ -115,7 +115,7 @@ float makeSquid( in vec2 st ) {
 
 	center = vec2( 0.6, 0.9 );
 
-	int max = 8;
+	const int max = 8;
 	for ( int i = 0 ; i < max ; i++ ) {
  		angle = PI2 * float( i ) / float( max ) + 1.3 * sin( u_time );
 		arm = center + vec2( distance * cos( angle ), distance * sin( angle ) );
