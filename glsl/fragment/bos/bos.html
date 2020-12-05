@@ -8,7 +8,17 @@
 			const FPS  = 33;
 
 			window.onload = function() {
-				ajaxFragmentList( loadFragments );
+				let search = document.location.search;
+				if ( -1 == search.indexOf( '?load=' ) ) {
+					ajaxFragmentList( loadFragments );
+				} else {
+					loadFragments( 
+						[ search.replace( /.*=/, '' ) ] 
+						, () => {
+							document.getElementsByTagName( 'button' )[ 0 ].click();
+						}
+					);
+				}
 			};
 
 			const ajaxFragmentList = ( listHandler ) => {
@@ -40,16 +50,18 @@
 				} );
 			};
 
-			const loadFragments = ( urls ) => {
+			const loadFragments = ( urls, callback ) => {
 				if ( urls.length ) {
-					loadFragment( urls.pop( urls ), urls );
+					loadFragment( urls.pop( urls ), urls, callback );
+				} else {
+					if ( callback ) callback();
 				}
 			};
 
-			const loadFragment = ( url, urls ) => { 
+			const loadFragment = ( url, urls, callback ) => { 
 				ajaxtomistic( url, ( err, txt ) => {
 					addFragment( url, txt );
-					loadFragments( urls );
+					loadFragments( urls,callback );
 				});
 			};
 
@@ -74,7 +86,11 @@
 				a.href = 'https://thebookofshaders.com/' + parts[ 1 ] + '/';
 				a.appendChild( document.createTextNode( title ) );
 				h3.appendChild( a );
-				h3.appendChild( document.createTextNode( ', ' + detail ) );
+				a = document.createElement( 'a' );
+				a.href = document.location.toString().replace( /\?.*/, '' ) + '?load=' + url.replace( /.*\//, '' );
+				a.appendChild( document.createTextNode( detail ) );
+				h3.appendChild( document.createTextNode( ', ' ) );
+				h3.appendChild( a );
 
 				let textarea = document.createElement( 'textarea' );
 				textarea.setAttribute( 'rows', ROWS );
@@ -97,11 +113,13 @@
 
 				let u_time = 0;
 				let delay = 1000 / FPS;
+				let u_mouse = {x:0.5,y:0.5}
 
 				let draw = function() {
 					u_time += FPS / 1000.0;
 					gl.uniform1f( uz.u_time, u_time );
 					gl.uniform2f( uz.u_resolution, canvas.width, canvas.height );
+					gl.uniform2f( uz.u_mouse, u_mouse.x, u_mouse.y );
 					gl.drawArrays( gl.TRIANGLES, 0,  3 );
 					setTimeout(
 						() => { window.requestAnimationFrame( draw ) }
@@ -109,7 +127,7 @@
 					);
 				};
 
-				button.onclick = function() {
+				button.onclick = () => {
 					const first = false == gl;
 					if ( first ) gl = canvas.getContext( 'webgl' );
 
@@ -118,6 +136,12 @@
 					uz = gled.uz;
 					if ( first ) draw();
 				};
+
+				canvas.onmousemove = ( e ) => {
+					let rect = canvas.getBoundingClientRect();
+					u_mouse.x = e.x - rect.x;
+					u_mouse.y = e.y - rect.y;
+				}
 			};
 
 			const glIt = ( gl, vertexShaderSource, fragmentShaderSource ) => {
@@ -146,7 +170,7 @@
 				gl.vertexAttribPointer( position_attrib_location, 2, gl.FLOAT, false, 0, 0);
 
 				let uz = {};
-				'u_resolution u_time'.split( ' ' ).forEach( v=>{ uz[ v ] = gl.getUniformLocation( program, v ) });
+				'u_resolution u_time u_mouse'.split( ' ' ).forEach( v=>{ uz[ v ] = gl.getUniformLocation( program, v ) });
 				return { program:program, uz:uz };
 			}
 
@@ -227,5 +251,10 @@
 		</style>
 	</HEAD>
 	<BODY>
+		<div>
+			<h2><a href="https://thebookofshaders.com/11/">The Book Of Shaders</a> Exercises</h2>
+			These are the exercise I did while going thru 
+			<a href="https://thebookofshaders.com/11/">The Book Of Shaders</a>
+		</div>
 	</BODY>
 </HTML>
