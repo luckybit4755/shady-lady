@@ -89,6 +89,7 @@
 				a = document.createElement( 'a' );
 				a.href = document.location.toString().replace( /\?.*/, '' ) + '?load=' + url.replace( /.*\//, '' );
 				a.appendChild( document.createTextNode( detail ) );
+				a.setAttribute( 'class', 'load' );
 				h3.appendChild( document.createTextNode( ', ' ) );
 				h3.appendChild( a );
 
@@ -234,6 +235,11 @@
 			a {
 				color: #fc6;
 				text-decoration: none;
+			}
+			a.load {
+				font-style: italic;
+				color: #6cf;
+
 			}
 			ffsk_button {
 				vertical-align:middle;
