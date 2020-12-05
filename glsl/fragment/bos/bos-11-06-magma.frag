@@ -80,15 +80,25 @@ void main() {
 	vec2 st = gl_FragCoord.xy/u_resolution.xy;
 	vec2 mx = u_mouse.xy/u_resolution.xy;
 
-	vec3 color = rgb( 77, 0 ,0 );
-
+	vec3 color = rgb( 66, 0 ,0 );
 	vec3 red = rgb( 255, 0, 0 );
 
-	st -= 1.5;
-	st *= rotate2d( 0.4 * noise( st + u_time * 0.3 ) );
-	st += 1.5;
+	// rotate 
 
-	color += red * magma( fract( st * 6. ), vec2( .5 ), 1.1 );
+	float o = 0.7;
+	st -= o;
+	st *= rotate2d( 0.1 + 0.1 * noise( st + u_time * 0.3 ) );
+	st += o;
+
+	// scale
+	st *= vec2( 9., 8. );
+	st.x += 0.2 * step( 1.0, mod( st.y, 2. ) ) * cos( u_time );
+
+
+	vec2 center = vec2( 0.4 ) + vec2( 0.1 ) * sin( noise( st + u_time ) );
+
+
+	color += red * magma( fract( st ), center, 1.1 );
 
     gl_FragColor = vec4( color, 1. );
 }
