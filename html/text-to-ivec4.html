@@ -1,0 +1,61 @@
+<HTML>
+	<HEAD>
+		<TITLE>text-to-ivec4</TITLE>
+		<script type="text/javascript">
+			window.onload = function() {
+				let textareas = document.getElementsByTagName( 'textarea' );
+				let text = textareas[ 0 ];
+				let code = textareas[ 1 ];
+
+				text.onkeyup = text.onchange = () => {
+					let s = text.value.trim();
+					if ( s ) {
+						code.value = textToCode( s );
+					} else {
+						code.value = 'maybe you should type something over there...';
+					}
+				};
+				text.onkeyup();
+			};
+
+			const textToCode = ( s ) => {
+				let q = 4 * 4;
+				let n = s.length % q;
+				if ( n ) {
+					s += new Array( q - n ).fill( ' ' ).join( '' );
+				}
+
+				let vecz = [];
+
+				let nz = [];
+				s.replace( /(....)/g, '$1\t' ).replace( /\t$/, '' ).split( '\t' ).forEach( (v,i) => {
+					nz.push( v.split( '' ).map( c=>c.charCodeAt(0) ).reduce( (n,c)=>n<<8|c ) );
+					if ( 4 == nz.length ) {
+						let idx = ( ( i + 1 ) / 4 - 1 ) * q;
+						let text = s.substr( idx, idx + q);
+						vecz.push( ['ivec4(', nz.join( ', ' ), ') /* "' + text + '" */' ].join( ' ' ) );
+						nz = [];
+					}
+				});
+
+				return vecz;
+			};
+		</script>
+		<style>
+			body {
+				font-family: sans-serif;
+				display: flex;
+				align-items: top;
+			}
+			label {
+				display:block;
+				font-weight:bold;
+				font-size:x-large;
+			}
+		</style>
+	</HEAD>
+	<BODY>
+		<span><label>Text</label><textarea rows=24 cols=40>test</textarea></span>
+		<span><label>Code</label><textarea rows=24 cols=80></textarea></span>
+	</BODY>
+</HTML>
