@@ -1,40 +1,15 @@
-# shaders
+I decided to completely revamp this project after I realized p5js didn't support glsl es 3.00.
 
-This repository is a place to keep my 
+The goal is to make a simple, modular development environment with support:
+1. include glsl code to avoid copy-pasta mess
+2. allow extensibility of interaction with js and glsl
+3. to create a simple declarative model of handling the webgl boilerplate
 
-## [Book of Shades](https://thebookofshaders.com/)
+Still a wip...
 
-Locally, working with https://github.com/patriciogonzalezvivo/glslViewer
+Check out (demo.html) for a rough idea....
 
-For demo / testing: [bos.html](glsl/fragment/bos/bos.html)
-
-## shadertoy 
-
-Had a lot of fun on https://www.shadertoy.com/ and wanted to try to do some stuff locally.
-
-The goal was to have minimal html and javascript boilerplate:
-
-	<HTML>
-		<HEAD>
-			<script type="text/javascript" src="../js/throw-shade.js"></script>
-		</HEAD>
-		<BODY></BODY>
-	</HTML>
-
-This is the contents of a simple-spheres.html, based on which, it picks up the shader 
-../glsl/fragment/simple-spheres.frag 
-
-There is some slight translation to make the shaderToy shader work, and it probly isn't really enough 
-except for cautious use.
-
-So far there is support for iResolution, iTime and (partially) iMouse via uniforms
-
-Demo: https://luckybit4755.github.io/shady-lady/html/simple-spheres.html
-
-Somewhat related:
-
-* https://github.com/SebastienGravel/ShaderToyTouchdesigner
-* https://nvoid.gitbooks.io/introduction-to-touchdesigner/content/GLSL/12-6-Importing-Shadertoy.html
+Documentation at some point... lot to do...
 
 Unrelated:
 
