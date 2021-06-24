@@ -1,7 +1,7 @@
 #!/bin/bash	
 
 _demo_main() {
-	find html/demo -type f | xargs sort -n | awk '
+	find html/demo -type f | sort -n | awk '
 		BEGIN {
 			print "<HTML><HEAD><STYLE>* { background:#223; color:#aa9; tab-size: 4; }</STYLE></HEAD><BODY><UL>";
 		}
