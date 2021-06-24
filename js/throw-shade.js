@@ -14,19 +14,31 @@ class ShadyLady {
 			fps: 50,
 			reload:false,
 			vertex:'#version 300 es\nlayout (location=0) in vec4 position;\nvoid main() {\n\tgl_Position = position;\n}\n',
-			/// TODO: refactor like https://www.sitepoint.com/best-practice-for-code-examples/
 			style: `
 				* { background:#223; color:#aa9; tab-size: 4; } 
 				#errorContainer { color:#f45; font-size:xx-large; }
-				#lineNumberContainer { 
-					display:inline-block; 
-					width:4%;
-					text-align:right;
-					margin-right:1em;
-				}
 				#fragmentContainer { 
-					display:inline-block; 
-					width:90%;
+					counter-reset: line;
+					overflow-x: scroll;
+					width:97%;
+				}
+				code {
+					counter-increment: line;
+					width:100%;
+					display:inline-block;
+				}
+				code:nth-child(odd) {
+					background: #292939;
+				}
+				code:before {
+					content: counter(line);
+					text-align: right;
+					padding-right: .5em;
+					width:3em;
+					-webkit-user-select: none;
+					border-right: 1px solid #664;
+					border-left: 1px solid #664;
+					display:inline-block;
 				}
 			`,
 		};
@@ -73,7 +85,8 @@ class ShadyLady {
 				hash:false,
 				contents:false,
 				resolved:false,
-				includes:{}
+				includes:{},
+				resolutions:{}
 			}
 		}
 	}
@@ -116,8 +129,7 @@ class ShadyLady {
 							let include = thiz.resolveIncludePath( file, name );
 							thiz.addFile( include );
 							entry.includes[ include ] = 1
-							// TODO: make this real and use it instead of re-resolving the include later...
-							//entry.resolutions[ name ] = include;
+							entry.resolutions[ name ] = include;
 						}
 					});
 
@@ -136,12 +148,15 @@ class ShadyLady {
 	}
 
 	resolveIncludePath( file, include ) {
-		// TODO: handle absolute and relative imports....
-		return this.root + '/glsl/include/' + include;
+		let includeRoot = this.root + '/glsl/include/';
+		if( '/' === include[ 0 ] || 0 != file.indexOf( includeRoot ) ) {
+			return includeRoot + include;
+		} else {
+			return file.replace( new RegExp( '/[^/]+$' ), '/' + include );
+		}
 	}
 
 	handleIncludes() {
-		//console.log( JSON.stringify( this.files, false, '\t' ));//.files );
 		for ( let i = 0 ; i < 33 ; i++ ) {
 			let resolved = 0;
 			Object.keys( this.files ).forEach( file => {
@@ -163,9 +178,8 @@ class ShadyLady {
 				let lines = entry.contents.split('\n');
 				lines.forEach(line=>{
 					if ( /^#include/.test(line)) {
-						// TODO: make this be the real fixed value from resolveIncludePath instead of redoing it here
 						let name = line.trim().replace(/.*\s/,'');
-						let include = this.root + '/glsl/include/' + name;
+						let include = entry.resolutions[ name ];
 
 						this.files[include].resolved.split('\n').forEach((line,lineNumber)=>{
 							line = line.replace( /\s*$/, '' );
@@ -189,7 +203,7 @@ class ShadyLady {
 			if ( 0 == resolved ) break;
 		}
 					
-		this.fragment = this.files[this.fragment].resolved;
+		this.fragmentSource = this.files[this.fragment].resolved;
 
 		this.throwShade();
 	};
@@ -209,11 +223,12 @@ class ShadyLady {
 		fragmentAnchor.setAttribute( 'href', this.fragment );
 		this.ui.linkContainer.appendChild( fragmentAnchor );
 
-		this.ui.fragmentContainer.appendChild( document.createTextNode( this.fragment ) );
-
-		let lineNumbers = new Array( this.fragment.trim().split( '\n' ).length ).fill( 0 ).map((v,i)=>i+1).join( '\n' );
-		this.ui.lineNumberContainer.appendChild( document.createTextNode( lineNumbers ) );
-
+		this.fragmentSource.trim().split( '\n' ).forEach( line => {
+			let code = document.createElement( 'code' );
+			code.appendChild( document.createTextNode( line ) );
+			this.ui.fragmentContainer.appendChild( code );
+			this.ui.fragmentContainer.appendChild( document.createTextNode( '\n' ) );
+		});
 		/* -------------------------------------------------------------- */
 
 		let vertex_shader = gl.createShader( gl.VERTEX_SHADER );
@@ -223,7 +238,7 @@ class ShadyLady {
 		console.log( gl.getShaderInfoLog( vertex_shader ));  
 
 		let fragment_shader = gl.createShader( gl.FRAGMENT_SHADER );
-		gl.shaderSource( fragment_shader, this.fragment );
+		gl.shaderSource( fragment_shader, this.fragmentSource );
 		gl.compileShader( fragment_shader );
 
 		let compilerMessage = gl.getShaderInfoLog( fragment_shader );
@@ -330,10 +345,12 @@ class ShadyLady {
 		this.addElement( 'fullscreen', 'button', 'fullscreen', this.ui.controlContainer );
 
 		this.addElement( 'errorContainer', 'pre' );
-
+/*
 		let codeContainer = this.addElement( 'codeContainer', 'div' );
 		this.addElement( 'lineNumberContainer', 'pre', false, codeContainer );
 		this.addElement( 'fragmentContainer', 'pre', false, codeContainer );
+frq*/
+		this.addElement( 'fragmentContainer', 'pre' );
 	}
 
 	addElement(name,type='div',text=false,parent=document.body) {
