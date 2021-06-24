@@ -1,0 +1,208 @@
+// "playing along at home with the inigo's greek temple tutorial" 
+//
+// by Val "valalalalala" GvM - 2020
+// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+//
+// Big thanks to BigWings's awesome tutorial and video
+// - https://www.shadertoy.com/view/XlGBW3
+// - https://youtu.be/PGtv-dBi2wE
+//
+// Camera is from https://github.com/glslify/glsl-look-at
+//
+
+#define RAY_MARCH_STEPS    133
+#define RAY_MARCH_TOO_FAR  float( RAY_MARCH_STEPS )
+#define RAY_MARCH_CLOSE    0.01
+
+#define PI2                      6.283185307179586
+
+#define VECTOR_PROJECTION(a,b,p) clamp( dot( p - a, b - a ) / dot( b - a, b - a ), 0., 1. )
+#define TRIG(len, angle)         (len * vec2( cos( angle ), sin( angle ) ))
+#define RGB(r,g,b)               vec3( float(r)/255., float(g)/255., float(b)/255. )
+
+#define JUST_BE_STILL__
+
+#define MAX 2
+
+mat3 makeCamera( vec3 origin, vec3 target, float roll ) {
+	vec3 up = vec3(sin(roll), cos(roll), 0.0);
+	vec3 zz = normalize(target - origin);
+	vec3 xx = normalize(cross(zz, up));
+	vec3 yy = normalize(cross(xx, zz));
+	return mat3( xx, yy, zz );
+}
+
+float hash( vec3 point ) {
+    return fract( 912463.530717 * sin( dot( point, vec3( 9127.9133, 7319.1519, 9157.9161 ) ) ) );   
+}
+
+float sdBox( vec3 p, vec3 b ){
+  vec3 q = abs(p) - b;
+  //return max(q.x,max(q.y,q.z));
+  return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+
+// aka opRepLimit, my gross version (only works for even limits..)
+vec2 limitedRepetition( vec2 point, float repeat, vec2 limit ) {
+    float halb = repeat * .5;
+    
+    float xv = 1. * step( abs( point.x - halb ), repeat * limit.x * .5 );
+    float yv = xv * step( abs( point.y - halb ), repeat * limit.y * .5 );
+    
+    return yv * mod( point.xy + halb, repeat ) - halb;
+}
+    
+
+float sceneDistance( vec3 point ) {
+    vec3 og = point;
+
+    float repeat = 1.;
+    point.xz = limitedRepetition( point.xz, repeat, vec2( 4., 2. ) );
+    
+    float r = .28;
+    r -= .03 * point.y; // thinner at top
+    r += .01 * pow( sin( 17. * atan( point.x, point.z ) ), 2. ); // ridges
+    r += .01 * pow( abs( sin( 6.28 * point.y ) ), .5 ); // sections
+    //r += 0.01 * pow( abs( sin( 2.* 3. * point.y ) ), 333.95 ); // sections
+    
+    
+    float height = 1.8;
+    float d = length( point.xz ) - r; // circle in xz ...
+    d = max( d, +point.y - height ); // clip top;
+    d = max( d, -point.y - height ); // clip bottom
+    
+
+    // box at top and bottom with the abs trick...
+    float thickness = .1;
+    float topSize = .4;
+    vec3 b = point;
+    b.y = abs(b.y);
+    float box = sdBox( b-vec3(.0,height,.0), vec3( topSize,thickness,topSize ) );
+    d = min( d, box -.02 );
+    
+    
+    float silly_floor = .0;//-.8 * abs( cos( iTime + og.x * og.z ) );
+    d = min( d, point.y + height + thickness + silly_floor ); // plane
+    
+    return d;
+}
+
+float sceneDistance2( vec3 point ) {
+    float angle = iTime;
+    //angle = hash(  point * .13 ) + iTime;
+   
+    
+    vec2 T = TRIG(1.,angle *0.);
+    vec3 a = +T.xyx;
+    vec3 b = -T.xyy;
+    
+    float n = sin( .01 *  hash(  point * .13 ) );
+
+    point.xyz = fract( point.xyz * 1.7 )-.1;
+    
+    
+    float h = VECTOR_PROJECTION( a, b, point );
+    vec3 q = a + ( b - a ) * h;
+    
+    return length( point - q ) - .1 + n * 1.3;
+    
+    return length( point - q ) - .018213 + n;
+}
+
+float rayMarch( in vec3 origin, in vec3 direction ) {
+    float total = .0;
+    for ( int i = 0 ; i < RAY_MARCH_STEPS ; i++ ) {
+        vec3 point = origin + direction * total;
+                
+        float current = sceneDistance( point );
+        total += current;
+        if ( total > RAY_MARCH_TOO_FAR || current < RAY_MARCH_CLOSE ) {
+            break;
+        }
+    }
+    return total;
+}
+
+vec3 sceneNormal(vec3 p) {
+	float d = sceneDistance(p);
+    vec2 e = vec2(RAY_MARCH_CLOSE, .0);
+    return normalize( d - vec3(
+        sceneDistance(p-e.xyy),
+        sceneDistance(p-e.yxy),
+        sceneDistance(p-e.yyx))
+    );
+}
+
+float pointLight( vec3 point, vec4 light ) {
+    vec3 normal = sceneNormal( point );
+    
+    vec3 towardLight = light.xyz - point;
+    float toLight = length( towardLight );
+    towardLight = normalize( light.xyz - point );
+
+    float diffuse = clamp( dot( normal, towardLight ), 0., 1. );
+    
+    vec3 lightStart = point + normal * RAY_MARCH_CLOSE * 2.;
+    float d = rayMarch( lightStart, towardLight );
+    diffuse *= 1. - 0.5 * smoothstep( d * 0.9, d, toLight );
+
+    float lightStrength = .7 + .3 * light.w / dot( toLight, toLight );  
+    return diffuse * lightStrength;
+}
+
+vec3 colorPoint( vec3 point ) {
+    vec4 light    = vec4( .0, 7., 1.8, 13. );
+    float ambient = 0.07;
+    float gamma   = 1.33;
+    
+    float lighting = pointLight( point, light );
+    lighting = ( 1.-  ambient ) * gamma * lighting;
+    
+    vec3 base = RGB( 235, 181, 107 );
+    
+	return vec3( base * ambient + base * lighting );
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
+	vec2 uv = ( 2. * gl_FragCoord.xy - iResolution.xy ) / iResolution.y; 
+   
+    vec2 T = TRIG( 1., iTime );
+    
+    // camera settings
+    
+	vec3  eye  = vec3( 6. * T.x, 1, 6. * T.y );
+    
+    
+    //eye = vec3( .0,.0,4. );
+	vec3  look = vec3( .0, 0, .0 );
+	float roll = 0.2 * T.x;
+    float zoom = 0.3 + 4. * ( 1. - abs( sin( iTime * .66 ) ) );
+    //eye  = vec3( 4. * cos( iTime ), .5, 4. * sin( iTime ) );
+    //look = vec3( .0, eye.y, .0 );
+    
+#ifdef JUST_BE_STILL
+    eye = vec3( .0, .4, 6. );
+    look = vec3( 0. );
+#endif
+    //look = vec3( eye.x + T.x, eye.y, eye.z + T.x );
+
+
+    zoom = 1.6;
+    roll = .0;
+    // setup and use the camera
+    
+	mat3 camera = makeCamera( eye, look, roll );
+    vec3 direction = vec3( uv.xy, zoom );
+    direction = normalize( camera * direction );
+    
+    // do the ray marching (sphere tracing)
+
+    float distance_ = rayMarch( eye, direction );
+    float tooFar = step( RAY_MARCH_TOO_FAR, distance_ );
+    vec3 point = eye + direction * distance_;
+    
+	// the end
+    
+    vec3 background = vec3( .0, .0, .2 );
+    fragColor = vec4( mix( colorPoint( point ), background, tooFar ), 1. );
+}
