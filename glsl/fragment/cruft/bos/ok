@@ -1,0 +1,240 @@
+/////////////////////////////////////////////////////////////////////////////
+//
+// "Marching with Camera" 
+//
+// by Val "valalalalala" GvM - 2020
+// Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+//
+// Big thanks to BigWings's awesome tutorial and video
+// - https://www.shadertoy.com/view/XlGBW3
+// - https://youtu.be/PGtv-dBi2wE
+//
+/////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////
+// ray marching values
+
+#define RAY_MARCH_STEPS    133
+#define RAY_MARCH_TOO_FAR  float( RAY_MARCH_STEPS )
+#define RAY_MARCH_CLOSE    0.01
+#define RAY_EPSILON        vec2( RAY_MARCH_CLOSE, .0 )
+
+/////////////////////////////////////////////////////////////////////////////
+// useful constants and macros
+
+#define PI2             6.283185307179586
+#define PROJECT(a,b,p)  clamp( dot( p - a, b - a ) / dot( b - a, b - a ), 0., 1. )
+#define TRIG(d, a)      ( d * vec2( cos( a ), sin( a ) ) )
+#define RGB(r,g,b)      vec3( float(r)/255., float(g)/255., float(b)/255. )
+#define MIN3(v)         min( v.x, min( v.y, v.z ) ) 
+#define MAX3(v)         max( v.x, max( v.y, v.z ) ) 
+#define ADD3(v)         ( v.x + v.y + v.z )
+#define MUL3(v)         ( v.x * v.y * v.z )
+#define POW2(v,p)       vec2( pow( v.x, p ), pow( v.y, p ) )
+
+#define RAND3(v)        fract( 333433.444469 * sin( dot( v, vec3( 449.457, 359.367, 787.797 ) ) ) )
+#define RAND2(v)        fract( 333433.444469 * sin( dot( v, vec2( 449.457, 359.367 ) ) ) )
+
+
+/////////////////////////////////////////////////////////////////////////////
+// toggle camera controlled by the mouse or by time
+
+#define CAMERA_MOUSE
+
+/////////////////////////////////////////////////////////////////////////////
+// signed distance functions for types
+
+float sdSphere( in vec3 point, in vec4 sphere ) {
+    return length( point-sphere.xyz ) - sphere.w;
+}
+
+float sdBox( in vec3 point, in vec3 size ) {
+    return MAX3( ( abs( point ) - size ) );
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// create the scene
+
+#define BALL   1.
+#define COLUMN 2.
+#define GROUND 4.
+
+vec2 which( in vec2 current, in vec2 test ) {
+    current.y = mix( current.y, test.y, step( test.x, current.x ) );
+    current.x = min( current.x, test.x );
+    return current;
+}
+
+float eq( in float i, in float value ) {  
+    return clamp(1.-step(0.2020,abs(i-floor(value))),0.,1.);
+}
+
+vec2 bouncer() {
+	vec2 bounce = abs( TRIG( 1., iTime * 3. ) );
+    return POW2( bounce, .7 );
+}
+
+vec2 sceneDistance( in vec3 point ) {
+    point.y += 1.33;
+    
+    //vec2 bounce  = bouncer();
+    
+    vec2 bounce = abs( TRIG( 1., iTime * 3. ) );
+    bounce = POW2( bounce, .7 );
+    
+    vec4 sphere1 = vec4( -1.3, 1. + 2. * bounce.x, .0, 1.);
+    vec4 sphere2 = vec4( +1.3, 1. + 2. * bounce.y, .0, 1.); 
+    vec3 box     = vec3( .2, 3., .2 );
+    
+    float d_sphere1 = sdSphere( point, sphere1 );
+    float d_sphere2 = sdSphere( point, sphere2 );
+    float d_box     = sdBox( point, box );
+    float d_ground  = point.y;
+        
+    vec2 closest = vec2( RAY_MARCH_TOO_FAR );
+    closest = which( closest, vec2( d_sphere1, BALL ) );
+    closest = which( closest, vec2( d_sphere2, BALL ) );
+    closest = which( closest, vec2( d_box,     COLUMN ) );
+    closest = which( closest, vec2( d_ground , GROUND ));
+    return closest;
+}
+
+vec3 colorAt( in vec3 point, vec2 d ) {
+    vec3 color = vec3( .0 );
+    
+    color += RGB( 255,  33,  33 ) * eq( d.y, BALL   );
+    color += RGB( 188, 188, 255 ) * eq( d.y, COLUMN );
+    color += RGB( 255, 255, 133 ) * eq( d.y, GROUND );
+    
+    return color;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// the ray marching bits
+
+vec2 rayMarch( in vec3 origin, in vec3 direction ) {
+    vec2 total = vec2(.0);
+    for ( int i = 0 ; i < RAY_MARCH_STEPS ; i++ ) {
+        vec3 point = origin + direction * total.x;        
+
+        vec2 current = sceneDistance( point );
+
+        total.x += current.x;
+        total.y = current.y;
+        if ( total.x > RAY_MARCH_TOO_FAR || current.x < RAY_MARCH_CLOSE ) {
+            break;
+        }
+    }
+    return total;
+}
+
+vec3 sceneNormal( in vec3 point ) {
+    return normalize( sceneDistance( point ).x - vec3(
+        sceneDistance( point - RAY_EPSILON.xyy ).x,
+        sceneDistance( point - RAY_EPSILON.yxy ).x,
+        sceneDistance( point - RAY_EPSILON.yyx ).x
+    ));
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// lighting
+
+float pointLight( vec3 point, vec4 light ) {
+    vec3 normal = sceneNormal( point );
+    
+    vec3 towardLight = light.xyz - point;
+    float toLight = length( towardLight );
+    towardLight = normalize( light.xyz - point );
+
+    float diffuse = clamp( dot( normal, towardLight ), 0., 1. );
+    
+    vec3 lightStart = point + normal * RAY_MARCH_CLOSE * 2.;
+    float d = rayMarch( lightStart, towardLight ).x;
+    diffuse *= 1. - 0.5 * smoothstep( d * 0.9, d, toLight );
+
+    float lightStrength = .7 + .3 * light.w / dot( toLight, toLight );  
+    return diffuse * lightStrength;
+}
+
+vec3 colorPoint( vec3 point, vec2 d ) {
+    vec4 light    = vec4( .4, 4., 0., 3. );
+    float ambient = 0.07;
+    float gamma   = 1.33;
+    
+    float lighting = pointLight( point, light );
+    lighting = ( 1. -  ambient ) * gamma * lighting;
+
+    vec3 color = colorAt( point, d );
+	return vec3( color * ambient + color * lighting );
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// simple camera
+
+struct Ray {
+    vec3 eye;
+    vec3 direction;
+};
+
+// from https://github.com/glslify/glsl-look-at
+mat3 makeCamera( vec3 origin, vec3 target, float roll ) {
+	vec3 up = vec3( sin( roll ), cos( roll ), .0 );
+	vec3 zz = normalize( target - origin );
+	vec3 xx = normalize( cross( zz, up ) );
+	vec3 yy = normalize( cross( xx, zz ) );
+	return mat3( xx, yy, zz );
+}
+
+Ray cameraRay( in vec2 uv ) {
+#ifdef CAMERA_MOUSE
+    vec2 mx = ( iMouse.xy / iResolution.xy ) -.5;
+    vec2 T = TRIG( 4., mx.x * PI2 );
+        
+    vec3 eye  = vec3( T.x, mx.y * 6. + 2. , T.y );
+    vec3 look = vec3( 0. );
+    
+    float zoom = 1.;
+    float roll = .0;
+    
+
+#else
+    vec2 T = TRIG( 1., iTime );
+    
+	vec3  eye  = vec3( 6. * T.x, 2., 6. * T.y );
+	vec3  look = vec3( .0, 0, .0 );
+    
+	float roll = 0.2 * T.x;
+    float zoom = 1. + .25 * abs( sin( iTime * .66 ) );
+#endif
+    
+	mat3 camera = makeCamera( eye, look, roll );
+    vec3 direction = normalize( camera * vec3( uv.xy, zoom ) );
+
+    return Ray( eye, direction );
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// main function
+
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
+	vec2 uv = ( 2. * gl_FragCoord.xy - iResolution.xy ) / iResolution.y;
+    
+    Ray ray = cameraRay( uv );
+    
+    vec2 d = rayMarch( ray.eye, ray.direction );
+    
+    
+    float tooFar = step( RAY_MARCH_TOO_FAR, d.x );
+    
+    d.x *= 1. + .3 * RAND2( uv );
+    vec3 point = ray.eye + ray.direction * d.x;
+    
+	// the end
+    
+    vec3 background = vec3( .5*(uv.xy +.5), abs( max(uv.x,uv.y) ) *2. );
+    fragColor = vec4( mix( colorPoint( point, d ), background, tooFar ), 1. );
+}
+
+// EOF
+/////////////////////////////////////////////////////////////////////////////

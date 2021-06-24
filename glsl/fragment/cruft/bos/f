@@ -1,0 +1,124 @@
+#version 300 es
+precision highp float;
+/////////////////////////////////////////////////////////////////////////////
+uniform vec2 iResolution;
+uniform vec4 iMouse;
+uniform float iTime;
+/////////////////////////////////////////////////////////////////////////////
+
+// TODO: move out this boilerplate
+precision highp float;
+out vec4 fragColor;
+
+const vec3 MARCH = vec3( .0, .001, 88. );
+
+//@makeCamera
+// zab,xZup,yXz | zxy:ab,zup,xz
+mat3 makeCamera( vec3 a, vec3 b, float roll ) {
+    vec3 up = vec3( sin(roll),cos(roll), .0);
+	vec3 z = normalize( b - a );
+	vec3 x = normalize( cross( z, up ) );
+	vec3 y = normalize( cross( x, z ) );
+	return mat3( x, y, z );
+}
+
+//@marcher
+//define: const vec3 MARCH = <<<MARCH|vec3( .0, .001, 99. )>>>;
+
+vec2 map( vec3 p );
+
+vec2 march( vec3 eye, vec3 direction ) { 
+    vec2 total = vec2(.0), now;
+    vec3 current = eye;
+    for( int i = 0 ; i < int( MARCH.z ) ; i++ ) {
+        total.y += ( now = map( current ) ).y;
+        total.x = now.x;
+        if ( abs( now.y ) < MARCH.y || total.y > MARCH.z ) break;
+        current += now.y * direction;
+    }
+    return total + MARCH.z * step( MARCH.z, total );
+}
+
+float map1( vec3 p ) {
+  return map(p).y;
+}
+
+// https://suricrasia.online/demoscene/functions/
+vec3 mapNormal(vec3 p,float d) {
+    mat3 k = mat3(p,p,p) - mat3(MARCH.y*d);
+    return normalize(map1(p) - vec3(  map1(k[0]),  map1(k[1]),  map1(k[2])) );
+}
+
+vec2 minnow( vec2 current, vec2 candidate ) {
+  return current.y < candidate.y ? current : candidate;
+  return mix( current, candidate, step( candidate.y, current.y ) ); // idk, why this doesn't work 
+}
+
+vec2 minnow( vec2 current, float id, float distance ) {
+  return minnow( current, vec2( id, distance ));
+}
+
+//@mainMarcher
+  vec3 colorHit(  vec2 uv, vec3 eye, vec3 direction, vec2 d, vec3 p, vec3 n );
+  vec3 colorMiss( vec2 uv, vec3 eye, vec3 direction, vec2 d );
+
+  vec3 mainMarcher( vec2 uv ) {
+    float cameraDistance = 2.;
+
+    float angleF = 1.33;
+    float angleX = iMouse.x * angleF;
+    float angleY = iMouse.y * angleF;
+
+    if ( .0 > iMouse.z ) {
+      angleX = angleY = .0;
+    }
+ 
+    vec3 eye = vec3( cameraDistance * sin( angleX ) , cameraDistance * sin( angleY ),  cameraDistance * cos( angleX ) );
+
+    vec3 target = vec3( 0 );
+    vec3 direction = normalize( makeCamera( eye, target, .0 ) * vec3( uv, 1. ) );
+
+    ////////////////////////////////////////////////////////////////
+
+    vec2 d = march( eye, direction );
+
+    vec3 color;
+    if ( d.y < MARCH.z  ) {
+      vec3 p = eye + d.y * direction;
+      vec3 n = mapNormal(p,d.y);
+      return colorHit( uv, eye, direction, d, p, n );
+    } 
+
+    return colorMiss( uv, eye, direction, d );
+  }
+
+  void main() {
+    vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y );
+    #ifdef AA
+      vec2 o = AA * vec2( .07, .03 );
+      fragColor = vec4( 
+        ( mainMarcher(uv) + mainMarcher(uv+o) + mainMarcher(uv+o.yx) ) / 3.,
+        1.
+    );
+    #else
+      fragColor = vec4( mainMarcher(uv),1.);
+    #endif
+  }
+
+// needs:  GLSL ES 3.00 and above only
+//vec3 COLORS[1] = vec3[1]( vec3( .0 ) );
+
+
+
+vec2 map( vec3 p ) {
+	return length( p - .3 );
+}
+
+vec3 colorHit( vec2 uv, vec3 eye, vec3 direction, vec2 d, vec3 p, vec3 n ) {
+	return vec3(1.);
+}
+
+vec3 colorMiss( vec2 uv, vec3 eye, vec3 direction, vec2 d ) {
+	return vec3(.0);
+}
+
