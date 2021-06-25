@@ -221,6 +221,7 @@ class ShadyLady {
 		this.ui.linkContainer.innerHTML = '';
 		let fragmentAnchor = document.createElement( 'a' );
 		fragmentAnchor.setAttribute( 'href', this.fragment );
+		fragmentAnchor.innerHTML = this.fragment;
 		this.ui.linkContainer.appendChild( fragmentAnchor );
 
 		this.fragmentSource.trim().split( '\n' ).forEach( line => {
