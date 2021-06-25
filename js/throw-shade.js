@@ -44,16 +44,21 @@ class ShadyLady {
 		};
 	}
 
-	load() {
-		this.loca = document.location.toString();
-		this.root = this.loca.replace( /\/html\/.*/, '/' );
-		let name = this.loca.substring( this.root.length ).replace(/^html/, '' ).replace(/\.html$/,'' );
 
-		this.fragment = this.root + 'glsl/fragment' + name + '.frag';
+	load() {
+		const trimLastPathSection = ( url ) => url.replace( /\/[^\/]*$/, '/' );
+
+		this.loca = document.location.toString();
+		this.root = trimLastPathSection( this.loca );
+		this.includeRoot = trimLastPathSection( trimLastPathSection( this.root.replace( /\/$/, '' ) ) ) + 'include/';
+
+		let name = this.loca.substring( this.root.length ).replace(/^html/, '' ).replace(/\.html$/,'' );
+		this.fragment = this.root + name + '.frag';
 
 		console.log( 'root:' + this.root );
 		console.log( 'name:' + name );
 		console.log( 'frag:' + this.fragment );
+		console.log( 'incl:' + this.includeRoot );
 
 		// try to pull "SHADY" from the global scope...
 		if( 'undefined' === typeof( SHADY ) ) {
@@ -148,9 +153,8 @@ class ShadyLady {
 	}
 
 	resolveIncludePath( file, include ) {
-		let includeRoot = this.root + '/glsl/include/';
-		if( '/' === include[ 0 ] || 0 != file.indexOf( includeRoot ) ) {
-			return includeRoot + include;
+		if( '/' === include[ 0 ] || 0 != file.indexOf( this.includeRoot ) ) {
+			return this.includeRoot + include;
 		} else {
 			return file.replace( new RegExp( '/[^/]+$' ), '/' + include );
 		}
