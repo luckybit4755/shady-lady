@@ -31,4 +31,4 @@ cat << HTML | cut -f2-
 HTML
 }
 
-_demo_main ${*}
+_demo_main ${*} > demo.html
