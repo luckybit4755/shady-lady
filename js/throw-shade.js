@@ -17,10 +17,14 @@ class ShadyLady {
 			style: `
 				* { background:#223; color:#aa9; tab-size: 4; } 
 				#errorContainer { color:#f45; font-size:xx-large; }
-				#fragmentContainer { 
+				.codeContainer { 
 					counter-reset: line;
 					overflow-x: scroll;
 					width:97%;
+				}
+				.toggle {
+					user-select: none;
+					-webkit-user-select: none;
 				}
 				code {
 					counter-increment: line;
@@ -88,7 +92,7 @@ class ShadyLady {
 			this.files[ file ] = {
 				loaded:false,
 				hash:false,
-				contents:false,
+				src:false,
 				resolved:false,
 				includes:{},
 				resolutions:{}
@@ -124,7 +128,7 @@ class ShadyLady {
 					let src = this.responseText;
 					let entry = thiz.files[ file ];
 					entry.loaded = true;
-					entry.contents = this.responseText;
+					entry.src = this.responseText;
 					entry.hash = hashText( this.responseText );
 
 					let lines = src.split('\n');
@@ -179,7 +183,7 @@ class ShadyLady {
 				resolved++;
 
 				let nuLines = [];
-				let lines = entry.contents.split('\n');
+				let lines = entry.src.split('\n');
 				lines.forEach(line=>{
 					if ( /^#include/.test(line)) {
 						let name = line.trim().replace(/.*\s/,'');
@@ -212,6 +216,16 @@ class ShadyLady {
 		this.throwShade();
 	};
 
+	addCode( src, element ) {
+		console.log(element);
+		src.trim().split( '\n' ).forEach( line => {
+			let code = document.createElement( 'code' );
+			code.appendChild( document.createTextNode( line ) );
+			element.appendChild( code );
+			element.appendChild( document.createTextNode( '\n' ) );
+		});
+	}
+
 	throwShade() {
 		/* -------------------------------------------------------------- */
 
@@ -222,18 +236,9 @@ class ShadyLady {
 
 		/* -------------------------------------------------------------- */
 
-		this.ui.linkContainer.innerHTML = '';
-		let fragmentAnchor = document.createElement( 'a' );
-		fragmentAnchor.setAttribute( 'href', this.fragment );
-		fragmentAnchor.innerHTML = this.fragment;
-		this.ui.linkContainer.appendChild( fragmentAnchor );
+		this.addCode( this.files[this.fragment].src, this.ui.sourceWrapper );
+		this.addCode( this.fragmentSource, this.ui.fragmentWrapper );
 
-		this.fragmentSource.trim().split( '\n' ).forEach( line => {
-			let code = document.createElement( 'code' );
-			code.appendChild( document.createTextNode( line ) );
-			this.ui.fragmentContainer.appendChild( code );
-			this.ui.fragmentContainer.appendChild( document.createTextNode( '\n' ) );
-		});
 		/* -------------------------------------------------------------- */
 
 		let vertex_shader = gl.createShader( gl.VERTEX_SHADER );
@@ -330,7 +335,7 @@ class ShadyLady {
 
 		this.ui.fullscreen.onclick = () => {
 			canvas.requestFullscreen();
-		}
+		};
 
 		draw();
 	}
@@ -345,17 +350,24 @@ class ShadyLady {
 		canvas.setAttribute( 'width', this.config.width );
 		canvas.setAttribute( 'height', this.config.height );
 
-		this.addElement( 'linkContainer' );
 		this.addElement( 'controlContainer' );
 		this.addElement( 'fullscreen', 'button', 'fullscreen', this.ui.controlContainer );
 
 		this.addElement( 'errorContainer', 'pre' );
-/*
-		let codeContainer = this.addElement( 'codeContainer', 'div' );
-		this.addElement( 'lineNumberContainer', 'pre', false, codeContainer );
-		this.addElement( 'fragmentContainer', 'pre', false, codeContainer );
-frq*/
-		this.addElement( 'fragmentContainer', 'pre' );
+
+		'fragment source'.split( ' ' ).forEach( type => {
+			let container = this.addElement( type + 'Container' );
+			let toggle = this.addElement( type + 'Toggle', 'div', '['+type+']', container )
+			let wrapper = this.addElement( type + 'Wrapper', 'pre', false, container )
+		
+			toggle.setAttribute( 'class', 'toggle' );
+			toggle.onclick = () => {
+				wrapper.style.display = ( 'none' === wrapper.style.display ) ? 'block' : 'none';
+			};
+
+			wrapper.style.display = 'none';
+			wrapper.setAttribute( 'class', 'codeContainer' );
+		});
 	}
 
 	addElement(name,type='div',text=false,parent=document.body) {
