@@ -3,6 +3,8 @@ window.onload = () => {
 };
 
 class ShadyLady {
+	static BODY = 'body';
+
 	constructor() {
 		this.load();
 	};
@@ -59,10 +61,10 @@ class ShadyLady {
 		let name = this.loca.substring( this.root.length ).replace(/^html/, '' ).replace(/\.html$/,'' );
 		this.fragment = this.root + name + '.frag';
 
-		console.log( 'root:' + this.root );
-		console.log( 'name:' + name );
-		console.log( 'frag:' + this.fragment );
-		console.log( 'incl:' + this.includeRoot );
+		this.info( 'root:' + this.root );
+		this.info( 'name:' + name );
+		this.info( 'frag:' + this.fragment );
+		this.info( 'incl:' + this.includeRoot );
 
 		// try to pull "SHADY" from the global scope...
 		if( 'undefined' === typeof( SHADY ) ) {
@@ -76,6 +78,17 @@ class ShadyLady {
 			});
 		}
 
+		if ( 'fragment' in this.config ) {
+			this.fragment = this.config.fragment;
+
+			// otherwise, should be a string pointing at a file...
+			if ( 'function' === typeof( this.fragment ) ) {
+				this.info( 'fragment contents are procedural, rather than file based' );
+				this.body = this.fragment( this );
+				this.fragment = ShadyLady.BODY;
+			}
+		}
+
 		this.files = {};
 
 		this.addFile( this.fragment );
@@ -83,12 +96,27 @@ class ShadyLady {
 		this.loadFiles();
 	}
 
+	static fromHtmlElement( element = document.body, clear = true ) {
+		const body = ShadyLady.htmlDecode( element.innerHTML );
+		if ( clear ) {
+			element.innerHTML = '';
+		}
+		return body;
+	}
+
+	/* from https://stackoverflow.com/questions/1912501/unescape-html-entities-in-javascript */
+	static htmlDecode(input){
+		const e = document.createElement('textarea');
+		e.innerHTML = input;
+		// handle case of empty input
+		return e.childNodes.length === 0 ? '' : e.childNodes[0].nodeValue.trim();
+	}
 
 	addFile( file ) {
 		if ( file in this.files) {
-			console.log( `already tracking ${file}` );
+			this.debug( `already tracking ${file}` );
 		} else {
-			console.log( `add file ${file} to the list` );
+			this.info( `add file ${file} to the list` );
 			this.files[ file ] = {
 				loaded:false,
 				hash:false,
@@ -111,113 +139,135 @@ class ShadyLady {
 		}
 
 		if ( toLoad ) {
-			console.log( `toLoad: ${toLoad}` );
+			this.info( `toLoad: ${toLoad}` );
 			this.loadFile( toLoad );
 		} else {
-			console.log( 'all loaded' );
+			this.info( 'all loaded' );
 			this.handleIncludes();
 		}
 	}
 
 	loadFile( file ) {
 		let thiz = this;
+
+		if ( ShadyLady.BODY === file ) {
+			return thiz.parseFile( file, this.body );
+		}
+
 		let xhttp = new XMLHttpRequest();
 		xhttp.onreadystatechange = function() {
 			if ( this.readyState == 4 ) {
 				if ( this.status == 200) {
-					let src = this.responseText;
-					let entry = thiz.files[ file ];
-					entry.loaded = true;
-					entry.src = this.responseText;
-					entry.hash = hashText( this.responseText );
-
-					let lines = src.split('\n');
-					lines.forEach(line=>{
-						if ( /^#include/.test(line)) {
-							let name = line.trim().replace(/.*\s/,'');
-							let include = thiz.resolveIncludePath( file, name );
-							thiz.addFile( include );
-							entry.includes[ include ] = 1
-							entry.resolutions[ name ] = include;
-						}
-					});
-
-					if ( !Object.keys( entry.includes ).length ) {
-						entry.resolved = src;
-					}
-
-					thiz.loadFiles();
+					thiz.parseFile( file, this.responseText );
 				} else {
-					console.error( 'ERROR: loading ' + file + ' -> ' + this.status );
+					console.error( 'loading ' + file + ' -> ' + this.status );
 				}
 			}
 		};
+
+		this.debug( 'GET: ' + file );
 		xhttp.open('GET', file + '?' + new Date().getTime(), true );
-		xhttp.send();
+		try {
+			xhttp.send();
+		} catch( e ) {
+			console.error( 'ERROR: when loading', file, e );
+		}
 	}
 
-	resolveIncludePath( file, include ) {
-		if( '/' === include[ 0 ] || 0 != file.indexOf( this.includeRoot ) ) {
-			return this.includeRoot + include;
-		} else {
-			return file.replace( new RegExp( '/[^/]+$' ), '/' + include );
+	parseFile( file, src ) {
+		let entry = this.files[ file ];
+		entry.loaded = true;
+		entry.src = src;
+		entry.hash = hashText( src );
+
+		let lines = src.split('\n');
+		lines.forEach(line=>{
+			if ( /^#include/.test(line)) {
+				let name = line.trim().replace(/.*\s/,'');
+				let include = this.resolveIncludePath( file, name );
+				this.addFile( include );
+				entry.includes[ include ] = 1
+				entry.resolutions[ name ] = include;
+			}
+		});
+
+		if ( !Object.keys( entry.includes ).length ) {
+			entry.resolved = src;
 		}
+
+		this.loadFiles();
+	};
+
+	resolveIncludePath( file, include ) {
+		let path = null;
+		if( '/' === include[ 0 ] || 0 != file.indexOf( this.includeRoot ) ) {
+			path = this.includeRoot + include;
+		} else {
+			path = file.replace( new RegExp( '/[^/]+$' ), '/' + include );
+		}
+		this.debug( `resolveIncludePath: "${file}" + "${include}" -> "${path}"` );
+		return path;
 	}
 
 	handleIncludes() {
 		for ( let i = 0 ; i < 33 ; i++ ) {
 			let resolved = 0;
-			Object.keys( this.files ).forEach( file => {
-				let entry = this.files[file];
-				let includes = Object.keys( entry.includes );
-				if ( !includes.length ) return;
+			Object.keys( this.files ).forEach( file => resolved = this.resolveInclude( file, resolved ) );
+			if ( 0 == resolved ) break;
+		}
+		this.fragmentSource = this.files[this.fragment].resolved;
+		this.throwShade();
+	};
 
-				console.log( file + ' needs to have ' + includes.join( ', ' ) );
-				let resolvable = true;
-				includes.forEach( include => {
-					let isResolved = ( false != this.files[include].resolved );
-					resolvable = resolvable && isResolved;
-				});
+	resolveInclude( file, resolved ) {
+		let entry = this.files[ file ];
+		let includes = Object.keys( entry.includes );
+		if ( !includes.length ) {
+			return;
+		}
 
-				if ( !resolvable ) return;
-				resolved++;
+		this.debug( file + ' needs to have ' + includes.join( ', ' ) );
 
-				let nuLines = [];
-				let lines = entry.src.split('\n');
-				lines.forEach(line=>{
-					if ( /^#include/.test(line)) {
-						let name = line.trim().replace(/.*\s/,'');
-						let include = entry.resolutions[ name ];
+		let resolvable = true;
+		includes.forEach( include => {
+			let isResolved = ( false != this.files[include].resolved );
+			resolvable = resolvable && isResolved;
+		});
 
-						this.files[include].resolved.split('\n').forEach((line,lineNumber)=>{
-							line = line.replace( /\s*$/, '' );
-							if ( line.length && !/\\/.test(line) ) {
-								let length = ( '' + line ) .replace(/\t/g, '    ').length;
-								for ( let i = 0 ; i < 80 - length ; i++ ) line += ' ';
-							
-								nuLines.push( line + ' // ' + name + '?' + (lineNumber + 1) );
-							} else {
-								nuLines.push( line );
-							}
-						});
+		if ( !resolvable ) return;
+		resolved++;
+
+		let nuLines = [];
+		let lines = entry.src.split('\n');
+
+		lines.forEach(line=>{
+			if ( /^#include/.test(line)) {
+				let name = line.trim().replace(/.*\s/,'');
+				let include = entry.resolutions[ name ];
+
+				this.files[include].resolved.split('\n').forEach((line,lineNumber)=>{
+					line = line.replace( /\s*$/, '' );
+					if ( line.length && !/\\/.test(line) ) {
+						let length = ( '' + line ) .replace(/\t/g, '    ').length;
+						for ( let i = 0 ; i < 80 - length ; i++ ) line += ' ';
+
+						nuLines.push( line + ' // ' + name + '?' + (lineNumber + 1) );
 					} else {
 						nuLines.push( line );
 					}
 				});
+			} else {
+				nuLines.push( line );
+			}
+		});
 
-				entry.resolved = nuLines.join('\n');
-			});
+		entry.resolved = nuLines.join('\n');
 
-			if ( 0 == resolved ) break;
-		}
-					
-		this.fragmentSource = this.files[this.fragment].resolved;
-
-		this.throwShade();
-	};
+		return resolved;
+	}
 
 	addCode( src, element ) {
-		console.log(element);
+		this.debug( 'addCode' + element );
 		src.trim().split( '\n' ).forEach( line => {
 			let code = document.createElement( 'code' );
 			code.appendChild( document.createTextNode( line ) );
@@ -245,7 +295,7 @@ class ShadyLady {
 
 		gl.shaderSource( vertex_shader, this.config.vertex );
 		gl.compileShader( vertex_shader );
-		console.log( gl.getShaderInfoLog( vertex_shader ));  
+		this.debug( gl.getShaderInfoLog( vertex_shader ));  
 
 		let fragment_shader = gl.createShader( gl.FRAGMENT_SHADER );
 		gl.shaderSource( fragment_shader, this.fragmentSource );
@@ -253,9 +303,9 @@ class ShadyLady {
 
 		let compilerMessage = gl.getShaderInfoLog( fragment_shader );
 		if ( compilerMessage ) {
-			console.log( 'compiler info start:' );
-			console.log( compilerMessage );
-			console.log( 'compiler info end.' );
+			this.debug( 'compiler info start:' );
+			this.debug( compilerMessage );
+			this.debug( 'compiler info end.' );
 			this.ui.errorContainer.innerHTML = compilerMessage;
 			canvas.style.display = 'none';
 
@@ -281,7 +331,7 @@ class ShadyLady {
 		let uz = {};
 		'iResolution iMouse iTime'.split( ' ' ).forEach( v=>{
 			uz[ v ] = gl.getUniformLocation( program, v );
-			console.log( v, '->', uz[ v ] );
+			this.debug( v, '->', uz[ v ] );
 		});
 
 		let iMouse = [.0,.0,-1.,.0];
@@ -379,6 +429,45 @@ class ShadyLady {
 		parent.appendChild( element );
 		return this.ui[ name ] = element;
 	}
+
+	// TODO: maybe worth while to factor out logging...
+	static DEBUG = 'DEBUG';
+	static INFO = 'INFO';
+	static WARN = 'WARN';
+	static ERROR = 'ERROR';
+
+	pad( n, length = 2, padding = '0' ) {
+	   return String( n ).padStart( length, padding );
+	}
+
+	debug(message) {
+		this.log(ShadyLady.DEBUG,message);
+	}
+	info(message) {
+		this.log(ShadyLady.INFO,message);
+	}
+	warn(message) {
+		this.log(ShadyLady.WARN,message);
+	}
+	error(message) {
+		this.log(ShadyLady.ERROR,message);
+	}
+	log(level,message) {
+		const d = new Date();
+		const ts = [
+			[d.getYear()+1900, d.getMonth(), d.getDay() ].map(n=>this.pad(n)).join( '-' ),
+			[d.getHours(),d.getMinutes(),d.getSeconds(),this.pad(d.getMilliseconds(),4)].map(n=>this.pad(n)).join( ':' )
+		].join( '_' );
+
+		const msg = [ ts, level.padEnd( 5, ' ' ), ':', message ].join( ' ' );
+
+		if ( level === ShadyLady.ERROR ) {
+			console.error( msg );
+		} else {
+			console.log( msg );
+		}
+	}
+
 }
 
 /*-----------------------------------------------------------------------*/

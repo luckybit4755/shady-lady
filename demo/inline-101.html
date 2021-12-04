@@ -1,0 +1,21 @@
+<HTML><HEAD>
+	<SCRIPT TYPE="text/javascript" SRC="../js/throw-shade.js"></SCRIPT>
+	<SCRIPT TYPE="text/javascript">
+		// simple example of using inline code
+		const SHADY = {
+			fragment: () => ShadyLady.fromHtmlElement()
+		};
+   	</SCRIPT>
+</HEAD>
+<HTML><BODY>
+#include es300-boilerplate.frag
+#include uniforms.frag
+
+uniform vec2 example;
+
+void main() {
+    vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
+    fragColor = uv.xyxy;
+}
+
+</BODY></HTML>
