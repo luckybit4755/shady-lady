@@ -47,6 +47,11 @@ class ShadyLady {
 					display:inline-block;
 				}
 			`,
+			uniforms: {
+				iTime:  ( shadyLady, iTime, iMouse, width, height ) => iTime,
+				iMouse: ( shadyLady, iTime, iMouse, width, height ) => iMouse,
+				iResolution: ( shadyLady, iTime, iMouse ) => [shadyLady.config.width,shadyLady.config.height]
+			}
 		};
 	}
 
@@ -71,11 +76,25 @@ class ShadyLady {
 			this.config = this.getDefaultConfig();
 		} else {
 			this.config = SHADY;
-			let def = this.getDefaultConfig();
+			const def = this.getDefaultConfig();
 			Object.keys( def ).forEach( k=>{ 
-				if( k in this.config ) return;
-				this.config[ k ] = def[ k ];
+				if( k in this.config ) {
+					const current = this.config[ k ];
+					const previous = def[ k ];
+					if ( Array.isArray( current ) ) {
+						this.config[ k ] = [...previous,...current];
+					} else {
+						if ( 'object' === typeof( current ) ) {
+							this.config[ k ] = {...previous,...current};
+						} else {
+							// keep new scalar value
+						}
+					}
+				} else {
+					this.config[ k ] = def[ k ];
+				}
 			});
+			console.log( SHADY );
 		}
 
 		if ( 'fragment' in this.config ) {
@@ -282,8 +301,6 @@ class ShadyLady {
 		let canvas = this.ui.canvas;
 		let gl = canvas.getContext( 'webgl2' );
 
-		canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-
 		/* -------------------------------------------------------------- */
 
 		this.addCode( this.files[this.fragment].src, this.ui.sourceWrapper );
@@ -291,34 +308,9 @@ class ShadyLady {
 
 		/* -------------------------------------------------------------- */
 
-		let vertex_shader = gl.createShader( gl.VERTEX_SHADER );
-
-		gl.shaderSource( vertex_shader, this.config.vertex );
-		gl.compileShader( vertex_shader );
-		this.debug( gl.getShaderInfoLog( vertex_shader ));  
-
-		let fragment_shader = gl.createShader( gl.FRAGMENT_SHADER );
-		gl.shaderSource( fragment_shader, this.fragmentSource );
-		gl.compileShader( fragment_shader );
-
-		let compilerMessage = gl.getShaderInfoLog( fragment_shader );
-		if ( compilerMessage ) {
-			this.debug( 'compiler info start:' );
-			this.debug( compilerMessage );
-			this.debug( 'compiler info end.' );
-			this.ui.errorContainer.innerHTML = compilerMessage;
-			canvas.style.display = 'none';
-
-			if ( /ERROR:/.test( compilerMessage ) ) {
-				throw compilerMessage;
-			}
-		}
-
-		let program = gl.createProgram();
-		gl.attachShader( program, vertex_shader );
-		gl.attachShader( program, fragment_shader );
-		gl.linkProgram( program );
-		gl.useProgram( program );
+		let vertex_shader = this.compileShader( gl, this.config.vertex, gl.VERTEX_SHADER );
+		let fragment_shader = this.compileShader( gl, this.fragmentSource, gl.FRAGMENT_SHADER );
+		let program = this.createProgram( gl, vertex_shader, fragment_shader );
 
 		let vertex_buf = gl.createBuffer( gl.ARRAY_BUFFER );
 		gl.bindBuffer( gl.ARRAY_BUFFER, vertex_buf );
@@ -329,37 +321,97 @@ class ShadyLady {
 		gl.vertexAttribPointer( position_attrib_location, 2, gl.FLOAT, false, 0, 0);
 
 		let uz = {};
-		'iResolution iMouse iTime'.split( ' ' ).forEach( v=>{
+		Object.keys( this.config.uniforms ).forEach( v=> {
 			uz[ v ] = gl.getUniformLocation( program, v );
-			this.debug( v, '->', uz[ v ] );
+			this.debug( `custom uniform "${v}" -> ${uz[v]}` );
 		});
 
 		let iMouse = [.0,.0,-1.,.0];
-
-		let iTime = 0.0;
-
-		let w = this.config.width;
-		let h = this.config.height;
-
-		let w2 = w * 0.5;
-		let h2 = h * 0.5;
+		this.mouseHandler( canvas, iMouse );
 
 		let draw = () => {
 			if( this.config.draw ) {
 				this.config.draw();
 			}
 
-			let iTime = new Date().getTime() / 1000.;
-			gl.uniform1f( uz.iTime, iTime );
+			const iTime = new Date().getTime() / 1000.;
 
-			gl.uniform2f( uz.iResolution, w, h );
-			gl.uniform4f( uz.iMouse, iMouse[ 0 ], iMouse[ 1 ], iMouse[ 2 ], iMouse[ 3 ] );
+			Object.keys( this.config.uniforms ).forEach( v=> {
+				const uniform = uz[ v ];
+				if ( !uniform ) return;
+
+				const value = this.config.uniforms[v]( this, iTime, iMouse );
+				if ( Array.isArray( value ) ) {
+					switch ( value.length ) {
+						case 1: gl.uniform1f( uniform, ...value ); break;
+						case 2: gl.uniform2f( uniform, ...value ); break;
+						case 3: gl.uniform3f( uniform, ...value ); break;
+						case 4: gl.uniform4f( uniform, ...value ); break;
+					}
+				} else {
+					 gl.uniform1f( uniform, value );
+				}
+			});
+
+			if ( this.config.onDraw ) {
+				this.config.onDraw( this, iTime, iMouse );
+			}
+
 			gl.drawArrays( gl.TRIANGLES, 0,  3 );
 			setTimeout(
 				() => { window.requestAnimationFrame( draw ) }
 				, 1000 / this.config.fps
 			);
 		};
+
+		this.ui.fullscreen.onclick = () => {
+			canvas.requestFullscreen();
+		};
+
+		draw();
+	}
+
+	compileShader( gl, src, type = null ) {
+		const t = type == gl.VERTEX_SHADER ? 'vertex' : 'fragment';
+		this.info( `${t} shader compilation begins` );
+		let shader = gl.createShader( type || gl.VERTEX_SHADER );
+		gl.shaderSource( shader, src );
+
+		gl.compileShader( shader );
+		let compilerMessage = gl.getShaderInfoLog( shader );
+		if ( compilerMessage ) {
+			this.debug( 'compiler info start:' );
+			this.debug( compilerMessage );
+			this.debug( 'compiler info end.' );
+			this.ui.errorContainer.innerHTML = compilerMessage;
+			canvas.style.display = 'none';
+
+			if ( /ERROR:/.test( compilerMessage ) ) {
+				throw compilerMessage;
+			}
+			this.warn( 'compilation issue' );
+		}
+		this.info( `${t} shader compilation end` );
+		return shader;
+	}
+
+	createProgram( gl, vertex_shader, fragment_shader ) {
+		const program = gl.createProgram();
+		gl.attachShader( program, vertex_shader );
+		gl.attachShader( program, fragment_shader );
+		gl.linkProgram( program );
+		gl.useProgram( program );
+		return program;
+	}
+
+	mouseHandler( canvas, iMouse ) {
+		let w = this.config.width;
+		let h = this.config.height;
+
+		let w2 = w * 0.5;
+		let h2 = h * 0.5;
+
+		canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
 		canvas.onmousedown = ( e ) => {
 			iMouse[ 2 ] = e.buttons;
@@ -383,11 +435,6 @@ class ShadyLady {
 			iMouse[2]=-1.;
 		};
 
-		this.ui.fullscreen.onclick = () => {
-			canvas.requestFullscreen();
-		};
-
-		draw();
 	}
 
 	createUi() {

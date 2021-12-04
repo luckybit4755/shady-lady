@@ -3,7 +3,13 @@
 	<SCRIPT TYPE="text/javascript">
 		// simple example of using inline code
 		const SHADY = {
-			fragment: () => ShadyLady.fromHtmlElement()
+			fragment: () => ShadyLady.fromHtmlElement(),
+			uniforms: {
+				example: ( shadyLady, iTime, iMouse ) => {
+					const now = iTime;
+					return [Math.cos(now),Math.sin(now)];
+				}
+			}
 		};
    	</SCRIPT>
 </HEAD>
@@ -15,7 +21,8 @@ uniform vec2 example;
 
 void main() {
     vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
+	uv += example;
     fragColor = uv.xyxy;
+    //fragColor = vec4( uv.xyx, 1. );
 }
 
-</BODY></HTML>
