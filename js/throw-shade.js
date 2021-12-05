@@ -289,18 +289,7 @@ class ShadyLady {
 		}
 
 		this.eventHandlers();
-
-		this.controls.frameCount = 0;
-		this.controls.startTime = ShadyLadyUtil.now();
-
-		const timeout = 1000 / this.config.fps;
-		const redraw = () => { window.requestAnimationFrame( draw ) };
-		const draw = () => {
-			this.draw();
-			setTimeout( redraw, timeout );
-		};
-
-		draw();
+		this.drawHandler();
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -311,9 +300,9 @@ class ShadyLady {
 
 		/* -------------------------------------------------------------- */
 
-		const vertex_shader = this.compileShader( gl, this.config.vertex, gl.VERTEX_SHADER );
-		const fragment_shader = this.compileShader( gl, this.fragmentSource, gl.FRAGMENT_SHADER );
-		const program = this.createProgram( gl, vertex_shader, fragment_shader );
+		const vertexShader = this.compileShader( gl, this.config.vertex, gl.VERTEX_SHADER );
+		const fragmentShader = this.compileShader( gl, this.fragmentSource, gl.FRAGMENT_SHADER );
+		const program = this.createProgram( gl, vertexShader, fragmentShader );
 
 		const vertex_buf = gl.createBuffer( gl.ARRAY_BUFFER );
 		gl.bindBuffer( gl.ARRAY_BUFFER, vertex_buf );
@@ -324,8 +313,8 @@ class ShadyLady {
 		gl.vertexAttribPointer( position_attrib_location, 2, gl.FLOAT, false, 0, 0);
 
 		this.context.gl = gl;
-		this.context.vertexShader = vertex_shader;
-		this.context.fragmentShader = fragment_shader;
+		this.context.vertexShader = vertexShader;
+		this.context.fragmentShader = fragmentShader;
 		this.context.program = program;
 
 		/* -------------------------------------------------------------- */
@@ -361,10 +350,10 @@ class ShadyLady {
 		return shader;
 	}
 
-	createProgram( gl, vertex_shader, fragment_shader ) {
+	createProgram( gl, vertexShader, fragmentShader ) {
 		const program = gl.createProgram();
-		gl.attachShader( program, vertex_shader );
-		gl.attachShader( program, fragment_shader );
+		gl.attachShader( program, vertexShader );
+		gl.attachShader( program, fragmentShader );
 		gl.linkProgram( program );
 		gl.useProgram( program );
 		return program;
@@ -446,10 +435,25 @@ class ShadyLady {
 			mouse.fill(.0);
 			mouse[2]=-1.;
 		};
-
 	}
 
 	/* ------------------------------------------------------------------ */
+
+	drawHandler() {
+		this.controls.frameCount = 0;
+		this.controls.startTime = ShadyLadyUtil.now();
+
+		const timeout = 1000 / this.config.fps;
+		const redraw = () => { window.requestAnimationFrame( draw ) };
+		const draw = () => {
+			if ( !this.controls.paused ) {
+				this.draw();
+			}
+			setTimeout( redraw, timeout );
+		};
+
+		draw();
+	}
 
 	draw() {
 		this.controls.currentTime = ShadyLadyUtil.now();
@@ -466,16 +470,20 @@ class ShadyLady {
 	}
 
 	updateUniforms() {
-		const gl = this.context.gl;
 		for( const [name,uniform] of this.context.uniforms.entries() ) {
-			const value = this.config.uniforms[ name ]( this );
-			switch ( value.length ) {
-				case 1:  gl.uniform1fv( uniform, value ); break;
-				case 2:  gl.uniform2fv( uniform, value ); break;
-				case 3:  gl.uniform3fv( uniform, value ); break;
-				case 4:  gl.uniform4fv( uniform, value ); break;
-				default: gl.uniform1f( uniform, value );
-			}
+			const handler = this.config.uniforms[ name ];
+			this.updateUniform( uniform, handler( this ) );
+		}
+	}
+
+	updateUniform( uniform, value ) {
+		const gl = this.context.gl;
+		switch ( value.length ) {
+			case 1:  gl.uniform1fv( uniform, value ); break;
+			case 2:  gl.uniform2fv( uniform, value ); break;
+			case 3:  gl.uniform3fv( uniform, value ); break;
+			case 4:  gl.uniform4fv( uniform, value ); break;
+			default: gl.uniform1f( uniform, value );
 		}
 	}
 
