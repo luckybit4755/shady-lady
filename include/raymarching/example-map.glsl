@@ -1,6 +1,6 @@
-#include sdf/iq/sdBox.glsl
-#include sdf/iq/sdTorus.glsl
-#include functions/minnow.glsl
+#include ../sdf/iq/sdBox.glsl
+#include ../sdf/iq/sdTorus.glsl
+#include ../functions/minnow.glsl
 
 // this is a sample scene with a torus, a ball and cube sitting on a plane
 vec2 map( vec3 p ) {
