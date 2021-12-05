@@ -2,15 +2,16 @@ window.addEventListener('load', ()=>{
 	new ShadyLady();
 });
 
-
-
 class ShadyLady {
-	static UI_KEYS = 'canvas fullscreen sourceWrapper fragmentWrapper';
+	static UI_KEYS = 'canvas fullscreen sourceWrapper fragmentWrapper errorContainer';
 	static CONTEXT_KEYS = 'gl vertexShader fragmentShader program uniforms';
 	static CONTROL_KEYS = 'mouse frameCount startTime currentTime';
 	static BODY = 'body';
 
+	/* ------------------------------------------------------------------ */
+
 	constructor() {
+		this.logger = new ShadyLadyLogger();
 		this.load();
 	};
 
@@ -20,6 +21,7 @@ class ShadyLady {
 			height:480,
 			fps: 50,
 			reload:false,
+			logLevel:ShadyLadyLogger.DEBUG,
 			uniforms: {
 				iTime:  ( shadyLady ) => shadyLady.controls.currentTime,
 				iMouse: ( shadyLady ) => shadyLady.controls.mouse,
@@ -31,55 +33,40 @@ class ShadyLady {
 	}
 
 	load() {
-		const trimLastPathSection = ( url ) => url.replace( /\/[^\/]*$/, '/' );
-
-		this.loca = document.location.toString();
-		this.root = trimLastPathSection( this.loca );
-		this.includeRoot = trimLastPathSection( trimLastPathSection( this.root.replace( /\/$/, '' ) ) ) + 'include/';
-
-		let name = this.loca.substring( this.root.length ).replace(/^html/, '' ).replace(/\.html$/,'' );
-		this.fragment = this.root + name + '.frag';
-
-		this.info( 'root:' + this.root );
-		this.info( 'name:' + name );
-		this.info( 'frag:' + this.fragment );
-		this.info( 'incl:' + this.includeRoot );
-
 		// try to pull "SHADY" from the global scope...
 		if( 'undefined' === typeof( SHADY ) ) {
 			this.config = this.getDefaultConfig();
 		} else {
-			this.config = SHADY;
-			const def = this.getDefaultConfig();
-			Object.keys( def ).forEach( k=>{ 
-				if( k in this.config ) {
-					const current = this.config[ k ];
-					const previous = def[ k ];
-					if ( Array.isArray( current ) ) {
-						this.config[ k ] = [...previous,...current];
-					} else {
-						if ( 'object' === typeof( current ) ) {
-							this.config[ k ] = {...previous,...current};
-						} else {
-							// keep new scalar value
-						}
-					}
-				} else {
-					this.config[ k ] = def[ k ];
-				}
-			});
+			this.config = this.mergeConfig( SHADY );
 		}
+		this.logger = new ShadyLadyLogger( this.config.logLevel );
+
+		this.loca = document.location.toString();
+		this.root = ShadyLadyUtil.trimLastPathSection( this.loca );
+		this.includeRoot = ShadyLadyUtil.trimLastPathSection( 
+			ShadyLadyUtil.trimLastPathSection( 
+				this.root.replace( /\/$/, '' ) 
+			) 
+		) + 'include/';
+
+		let name = this.loca.substring( this.root.length ).replace(/^html/, '' ).replace(/\.html$/,'' );
+		this.fragment = this.root + name + '.frag';
+
+		this.logger.info( 'root:' + this.root );
+		this.logger.info( 'name:' + name );
+		this.logger.info( 'frag:' + this.fragment );
+		this.logger.info( 'incl:' + this.includeRoot );
 
 		if ( 'fragment' in this.config ) {
 			this.fragment = this.config.fragment;
 
 			// otherwise, should be a filename... I guess...
 			if ( ShadyLadyUtil.isFunction( this.fragment ) ) {
-				this.info( 'fragment contents are procedural, rather than file based' );
+				this.logger.info( 'fragment contents are procedural, rather than file based' );
 				this.body = this.fragment( this );
 				this.fragment = ShadyLady.BODY;
 			} else {
-				this.info( 'fragment filename is ' + this.fragment );
+				this.logger.info( 'fragment filename is ' + this.fragment );
 			}
 		}
 
@@ -96,20 +83,45 @@ class ShadyLady {
 			} else {
 				this.ui.canvas = this.config.canvas;
 			}
-			this.debug( 'using user supplied canvas: ' + this.ui.canvas );
+			this.logger.debug( 'using user supplied canvas: ' + this.ui.canvas );
 		} else {
+			this.logger.debug( 'creating default ui' );
 			this.createUi();
-			this.debug( 'creating default ui' );
+			this.logger.debug( 'created default ui' );
 		}
 
 		this.loadFiles();
 	}
 
+	mergeConfig( config ) {
+		const def = this.getDefaultConfig();
+		Object.keys( def ).forEach( k=>{ 
+			if( k in config ) {
+				const current = config[ k ];
+				const previous = def[ k ];
+				if ( Array.isArray( current ) ) {
+					config[ k ] = [...previous,...current];
+				} else {
+					if ( 'object' === typeof( current ) ) {
+						config[ k ] = {...previous,...current};
+					} else {
+						// keep new scalar value
+					}
+				}
+			} else {
+				config[ k ] = def[ k ];
+			}
+		});
+		return config;
+	}
+
+	/* ------------------------------------------------------------------ */
+
 	addFile( file ) {
 		if ( file in this.files) {
-			this.debug( `already tracking ${file}` );
+			this.logger.debug( `already tracking ${file}` );
 		} else {
-			this.info( `add file ${file} to the list` );
+			this.logger.info( `add file ${file} to the list` );
 			this.files[ file ] = {
 				loaded:false,
 				hash:false,
@@ -132,10 +144,10 @@ class ShadyLady {
 		}
 
 		if ( toLoad ) {
-			this.info( `toLoad: ${toLoad}` );
+			this.logger.info( `toLoad: ${toLoad}` );
 			this.loadFile( toLoad );
 		} else {
-			this.info( 'all loaded' );
+			this.logger.info( 'all loaded' );
 			this.handleIncludes();
 		}
 	}
@@ -158,7 +170,7 @@ class ShadyLady {
 			}
 		};
 
-		this.debug( 'GET: ' + file );
+		this.logger.debug( 'GET: ' + file );
 		xhttp.open('GET', file + '?' + new Date().getTime(), true );
 		try {
 			xhttp.send();
@@ -198,7 +210,7 @@ class ShadyLady {
 		} else {
 			path = file.replace( new RegExp( '/[^/]+$' ), '/' + include );
 		}
-		this.debug( `resolveIncludePath: "${file}" + "${include}" -> "${path}"` );
+		this.logger.debug( `resolveIncludePath: "${file}" + "${include}" -> "${path}"` );
 		return path;
 	}
 
@@ -219,7 +231,7 @@ class ShadyLady {
 			return;
 		}
 
-		this.debug( file + ' needs to have ' + includes.join( ', ' ) );
+		this.logger.debug( file + ' needs to have ' + includes.join( ', ' ) );
 
 		let resolvable = true;
 		includes.forEach( include => {
@@ -259,30 +271,27 @@ class ShadyLady {
 		return resolved;
 	}
 
-	addCode( src, element ) {
-		this.debug( 'addCode' + element );
-		src.trim().split( '\n' ).forEach( line => {
-			let code = document.createElement( 'code' );
-			code.appendChild( document.createTextNode( line ) );
-			element.appendChild( code );
-			element.appendChild( document.createTextNode( '\n' ) );
-		});
-	}
+	/* ------------------------------------------------------------------ */
 
 	throwShade() {
+		/* for use cases that just want the preprocessing bits... */
+		const vertexSource = this.config.vertex;
+		const fragementSource = this.fragmentSource;
+		if ( this.config.sourceListener && this.config.sourceListener( vertexSource, fragmentSource ) ) {
+			return;
+		}
+
 		this.gloItUp();
 
-		this.controls.mouse = [.0,.0,-1.,.0];
-		this.mouseHandler( this.ui.canvas, this.controls.mouse );
+		if( this.ui.sourceWrapper ) {
+			this.showCode( this.files[this.fragment].src, this.ui.sourceWrapper );
+			this.showCode( this.fragmentSource, this.ui.fragmentWrapper );
+		}
+
+		this.eventHandlers();
 
 		this.controls.frameCount = 0;
 		this.controls.startTime = ShadyLadyUtil.now();
-
-		if ( this.ui.fullscreen ) {
-			this.ui.fullscreen.onclick = () => {
-				canvas.requestFullscreen();
-			};
-		}
 
 		const timeout = 1000 / this.config.fps;
 		const redraw = () => { window.requestAnimationFrame( draw ) };
@@ -294,18 +303,11 @@ class ShadyLady {
 		draw();
 	}
 
-	gloItUp() {
-		/* -------------------------------------------------------------- */
+	/* ------------------------------------------------------------------ */
 
+	gloItUp() {
 		const canvas = this.ui.canvas;
 		const gl = canvas.getContext( 'webgl2' );
-
-		/* -------------------------------------------------------------- */
-
-		if( this.ui.sourceWrapper ) {
-			this.addCode( this.files[this.fragment].src, this.ui.sourceWrapper );
-			this.addCode( this.fragmentSource, this.ui.fragmentWrapper );
-		}
 
 		/* -------------------------------------------------------------- */
 
@@ -326,44 +328,36 @@ class ShadyLady {
 		this.context.fragmentShader = fragment_shader;
 		this.context.program = program;
 
-		// TODO: looking into "uniform blocks"
-		// http://www.lighthouse3d.com/tutorials/glsl-tutorial/uniform-blocks/
+		/* -------------------------------------------------------------- */
 
-		const uniforms = new Map();
-		Object.keys( this.config.uniforms ).forEach( name => {
-			const location = gl.getUniformLocation( program, name  );
-			if ( location ) {
-				uniforms.set( name , location );
-				this.debug( `uniform "${name }" -> ${uniforms.get(name )}` );
-			} else {
-				this.debug( `uniform "${name }" not found, perhaps unused` );
-			}
-		});
-
-		this.context.uniforms = uniforms;
+		this.setupUniforms();
 	}
 
 	compileShader( gl, src, type = null ) {
 		const t = type == gl.VERTEX_SHADER ? 'vertex' : 'fragment';
-		this.info( `${t} shader compilation begins` );
+		this.logger.info( `${t} shader compilation begins` );
 		let shader = gl.createShader( type || gl.VERTEX_SHADER );
 		gl.shaderSource( shader, src );
 
 		gl.compileShader( shader );
 		let compilerMessage = gl.getShaderInfoLog( shader );
 		if ( compilerMessage ) {
-			this.debug( 'compiler info start:' );
-			this.debug( compilerMessage );
-			this.debug( 'compiler info end.' );
-			this.ui.errorContainer.innerHTML = compilerMessage;
-			canvas.style.display = 'none';
+			this.logger.debug( 'compiler info start:' );
+			this.logger.debug( compilerMessage );
+			this.logger.debug( 'compiler info end.' );
+		
+			if ( this.ui.errorContainer ) {
+				this.ui.errorContainer.innerHTML = compilerMessage;
+				canvas.style.display = 'none';
+			}
 
 			if ( /ERROR:/.test( compilerMessage ) ) {
+				this.logger.error( 'compilation error' );
 				throw compilerMessage;
 			}
-			this.warn( 'compilation issue' );
+			this.logger.warn( 'compilation issue' );
 		}
-		this.info( `${t} shader compilation end` );
+		this.logger.info( `${t} shader compilation end` );
 		return shader;
 	}
 
@@ -376,31 +370,49 @@ class ShadyLady {
 		return program;
 	}
 
-	draw() {
-		this.controls.currentTime = ShadyLadyUtil.now();
-		this.controls.frameCount++;
-
-		if( this.config.draw && this.config.draw( this ) ) {
-			return;
-		}
-
-		this.updateUniforms();
-
+	setupUniforms() {
 		const gl = this.context.gl;
-		gl.drawArrays( gl.TRIANGLES, 0,  3 );
+		const program = this.context.program;
+
+		// TODO: looking into "uniform blocks"
+		// http://www.lighthouse3d.com/tutorials/glsl-tutorial/uniform-blocks/
+
+		const uniforms = new Map();
+		Object.keys( this.config.uniforms ).forEach( name => {
+			const location = gl.getUniformLocation( program, name  );
+			if ( location ) {
+				uniforms.set( name , location );
+				this.logger.debug( `uniform "${name }" -> ${uniforms.get(name )}` );
+			} else {
+				this.logger.debug( `uniform "${name }" not found, perhaps unused` );
+			}
+		});
+
+		this.context.uniforms = uniforms;
 	}
 
-	updateUniforms() {
-		const gl = this.context.gl;
-		for( const [name,uniform] of this.context.uniforms.entries() ) {
-			const value = this.config.uniforms[ name ]( this );
-			switch ( value.length ) {
-				case 1:  gl.uniform1fv( uniform, value ); break;
-				case 2:  gl.uniform2fv( uniform, value ); break;
-				case 3:  gl.uniform3fv( uniform, value ); break;
-				case 4:  gl.uniform4fv( uniform, value ); break;
-				default: gl.uniform1f( uniform, value );
-			}
+	/* ------------------------------------------------------------------ */
+
+	showCode( src, element ) {
+		this.logger.debug( 'showCode' + element );
+		src.trim().split( '\n' ).forEach( line => {
+			let code = document.createElement( 'code' );
+			code.appendChild( document.createTextNode( line ) );
+			element.appendChild( code );
+			element.appendChild( document.createTextNode( '\n' ) );
+		});
+	}
+
+	/* ------------------------------------------------------------------ */
+
+	eventHandlers() {
+		this.controls.mouse = [.0,.0,-1.,.0];
+		this.mouseHandler( this.ui.canvas, this.controls.mouse );
+
+		if ( this.ui.fullscreen ) {
+			this.ui.fullscreen.onclick = () => {
+				canvas.requestFullscreen();
+			};
 		}
 	}
 
@@ -437,6 +449,38 @@ class ShadyLady {
 
 	}
 
+	/* ------------------------------------------------------------------ */
+
+	draw() {
+		this.controls.currentTime = ShadyLadyUtil.now();
+		this.controls.frameCount++;
+
+		if( this.config.draw && this.config.draw( this ) ) {
+			return;
+		}
+
+		this.updateUniforms();
+
+		const gl = this.context.gl;
+		gl.drawArrays( gl.TRIANGLES, 0,  3 );
+	}
+
+	updateUniforms() {
+		const gl = this.context.gl;
+		for( const [name,uniform] of this.context.uniforms.entries() ) {
+			const value = this.config.uniforms[ name ]( this );
+			switch ( value.length ) {
+				case 1:  gl.uniform1fv( uniform, value ); break;
+				case 2:  gl.uniform2fv( uniform, value ); break;
+				case 3:  gl.uniform3fv( uniform, value ); break;
+				case 4:  gl.uniform4fv( uniform, value ); break;
+				default: gl.uniform1f( uniform, value );
+			}
+		}
+	}
+
+	/* ------------------------------------------------------------------ */
+
 	createUi() {
 		this.addElement( 'style', 'style', this.config.style, document.head );
 		this.addElement( 'canvasContainer' );
@@ -465,48 +509,58 @@ class ShadyLady {
 		});
 	}
 
-	addElement(name,type='div',text=false,parent=document.body) {
+	addElement( name, type='div', text = false, parent = document.body ) {
 		let element = document.createElement( type );
 		element.setAttribute( 'id', name );
+		element.setAttribute( 'name', name );
+		element.setAttribute( 'shady', 'af' );
 		if ( text ) {
 			element.appendChild( document.createTextNode( text ) );
 		}
 		parent.appendChild( element );
 		return this.ui[ name ] = element;
 	}
+}
 
-	// TODO: maybe worth while to factor out logging...
+/*-----------------------------------------------------------------------*/
+
+class ShadyLadyLogger {
+	static TRACE = 'TRACE';
 	static DEBUG = 'DEBUG';
-	static INFO = 'INFO';
-	static WARN = 'WARN';
+	static INFO  = 'INFO';
+	static WARN  = 'WARN';
 	static ERROR = 'ERROR';
+	static TO_INT = { TRACE:0, DEBUG:1, INFO:2, WARN:3, ERROR:4 };
 
-	pad( n, length = 2, padding = '0' ) {
-	   return String( n ).padStart( length, padding );
+	constructor( level = ShadyLadyLogger.DEBUG ) {
+		this.level = ShadyLadyLogger.TO_INT[ level ];
 	}
 
-	debug(message) {
-		this.log(ShadyLady.DEBUG,message);
+	debug( message ) {
+		this.log( ShadyLadyLogger.DEBUG, message );
 	}
+
 	info(message) {
-		this.log(ShadyLady.INFO,message);
+		this.log( ShadyLadyLogger.INFO, message );
 	}
+
 	warn(message) {
-		this.log(ShadyLady.WARN,message);
+		this.log( ShadyLadyLogger.WARN, message );
 	}
+
 	error(message) {
-		this.log(ShadyLady.ERROR,message);
+		this.log( ShadyLadyLogger.ERROR, message );
 	}
-	log(level,message) {
-		const d = new Date();
-		const ts = [
-			[d.getYear()+1900, d.getMonth(), d.getDay() ].map(n=>this.pad(n)).join( '-' ),
-			[d.getHours(),d.getMinutes(),d.getSeconds(),this.pad(d.getMilliseconds(),4)].map(n=>this.pad(n)).join( ':' )
-		].join( '_' );
 
-		const msg = [ ts, level.padEnd( 5, ' ' ), ':', message ].join( ' ' );
+	log( level, message ) {
+		const msg = [ 
+			ShadyLadyUtil.timestamp(), 
+			level.padEnd( 5, ' ' ), 
+			':', 
+			message 
+		].join( ' ' );
 
-		if ( level === ShadyLady.ERROR ) {
+		if ( level === ShadyLadyLogger.ERROR ) {
 			console.error( msg );
 		} else {
 			console.log( msg );
@@ -563,8 +617,35 @@ class ShadyLadyUtil {
 		return { top: top, left: left };
 	}
 
+	static trimLastPathSection( url ) {
+	   return url.replace( /\/[^\/]*$/, '/' );
+	}
+
 	static now() {
 		return new Date().getTime() / 1000.;
+	}
+
+	static timestamp() {
+		const d = new Date();
+		return [
+			[
+				d.getYear()+1900, 
+				d.getMonth(), 
+				d.getDay() 
+			].map( n => ShadyLadyUtil.pad( n ) )
+			 .join( '-' ),
+			[
+				d.getHours(),
+				d.getMinutes(),
+				d.getSeconds(),
+				this.pad( d.getMilliseconds(),4)
+			].map(n=>this.pad(n))
+			 .join( ':' )
+		].join( '_' );
+	}
+
+	static pad( n, length = 2, padding = '0' ) {
+	   return String( n ).padStart( length, padding );
 	}
 
 	static isFunction( f ) {
