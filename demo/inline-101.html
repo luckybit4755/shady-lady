@@ -17,7 +17,10 @@
 					return Math.cos(t) + 0.01 * t; // jumps around somehow...
 					return ( Math.cos(t) + 1 ) * 2.; // this works...
 				}
-					
+			},
+			textures: {
+				xShadyLady: '../images/42-97385_3O-X_SHADY_LADY.jpg',
+				webcam: 'webcam'
 			}
 		};
    	</SCRIPT>
@@ -32,27 +35,29 @@
 uniform vec2 example;
 uniform float idk;
 
+/* matches key in config.textures */
+uniform sampler2D xShadyLady;
+uniform sampler2D webcam;
+
 void main() {
     vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
-	uv -= example; // this works as expected...
+	vec2 moving = uv - example; 
 
-	float f = iTime + iMouse.x;
-	//f = iMouse.x;
-	f = idk;//.x;
-	f = 2.*iTime; // why does this not work?
-	uv -= vec2( 
-		cos(f),
-		sin(f)
-	) * .2;
+	float f = iTime; // for some reason, this is not updating...
+	moving -= vec2( cos(f), sin(f) ) * .2;
 
 	float thickness = .007 + cos( iTime ) * .003;
-
-	fragColor = vec4(
-		outline( .05, thickness, length( uv.xy ) ),
-		outline( .05, thickness, langth( uv.xy ) ),
-		outline( .05, thickness, langth( uv.xyx ) ),
-		1//fract(iTime) * .5 + .5
+	vec4 moved = vec4(
+		outline( .05, thickness, length( moving.xy ) ),
+		outline( .05, thickness, langth( moving.xy ) ),
+		outline( .05, thickness, langth( moving.xyx ) ),
+		1.
 	);
+
+	vec4 sl = texture( xShadyLady, uv * vec2( .66, 1. ) + vec2( 0.5 ) );
+	vec4 wc = texture( webcam, uv * vec2( .66, 1. ) * 1.5 + vec2( 0.5 ) );
+
+	fragColor = max( .2 * sl + .8 * wc, moved );
 }
 </canvas>
 </BODY></HTML>

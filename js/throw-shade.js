@@ -320,6 +320,7 @@ class ShadyLady {
 		/* -------------------------------------------------------------- */
 
 		this.setupUniforms();
+		this.setupTextures();
 	}
 
 	compileShader( gl, src, type = null ) {
@@ -378,6 +379,83 @@ class ShadyLady {
 		});
 
 		this.context.uniforms = uniforms;
+	}
+
+	setupTextures() {
+		this.textures = [];
+
+		let id = this.context.gl.TEXTURE0;
+		Object.keys( this.config.textures ).forEach( name => {
+			const src = this.config.textures[ name ];
+			if ( 'string' === typeof( src ) ) {
+				if ( 'webcam' === src ) {
+					this.setupWebcamTexture( name, id );
+				} else {
+					this.setupImageTexture( name, id, src );
+				}
+			} else {
+				this.setupTexture( name, id, src );
+			}
+			id++;
+		});
+	}
+
+	setupImageTexture( name, id, src ) {
+		const image = document.createElement( 'img' );
+		image.style.display = 'none';
+		image.src = src;
+		image.addEventListener( 'load', () => this.setupTexture( name, id, image ) );
+	}
+
+	setupWebcamTexture( name, id ) {
+		try {
+			const thiz = this;
+			navigator.mediaDevices.getUserMedia( { video:true } )
+				.then( function( camera ) { 
+					const video = document.createElement( 'video' );
+					video.style.display = 'none';
+					video.width = 256;
+					video.height = 256;
+					video.autoplay = video.playsinline = true;
+					video.srcObject = camera;
+					video.addEventListener('playing',()=>{
+						thiz.setupTexture( name, id, video );
+					});
+				})
+				.catch( function( err ) { thiz.error( 'could not get camera access:' +  err ) } )
+			;
+		} catch ( e ) {
+			this.error( 'error getting camera: ' + e );
+			if ( !/^https:/.test( document.location.toString() ) ) {
+				this.warn( 'note: frequently webcam is only avaible on sites with https...' );
+			}
+		}
+	}
+
+	setupTexture( name, id, image ) {
+		const gl = this.context.gl;
+		const program = this.context.program;
+
+		const texture = gl.createTexture();
+        gl.bindTexture( gl.TEXTURE_2D, texture );
+        gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, true );
+        gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
+        gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
+
+		const uniformId = id - gl.TEXTURE0;
+		const textureLocation = gl.getUniformLocation( program, name );
+		gl.uniform1i( textureLocation, uniformId );
+
+		this.logger.debug( `bind texture ${name} to ${id} (${uniformId})` );
+
+		this.textures.push( () => {
+			const gl = this.context.gl;
+			gl.activeTexture( id );
+			gl.bindTexture( gl.TEXTURE_2D, texture );
+			gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image );
+		});
+
+		return texture;
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -464,6 +542,7 @@ class ShadyLady {
 		}
 
 		this.updateUniforms();
+		this.updateTextures();
 
 		const gl = this.context.gl;
 		gl.drawArrays( gl.TRIANGLES, 0,  3 );
@@ -485,6 +564,10 @@ class ShadyLady {
 			case 4:  gl.uniform4fv( uniform, value ); break;
 			default: gl.uniform1f( uniform, value );
 		}
+	}
+
+	updateTextures() {
+		this.textures.forEach( cb => cb() );
 	}
 
 	/* ------------------------------------------------------------------ */
