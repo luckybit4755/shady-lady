@@ -153,13 +153,15 @@ class ShadyLady {
 	}
 
 	loadFile( file ) {
-		let thiz = this;
-
 		if ( ShadyLady.BODY === file ) {
-			return thiz.parseFile( file, this.body );
+			return this.parseFile( file, this.body );
 		}
 
-		let xhttp = new XMLHttpRequest();
+		const thiz = this;
+		const xhttp = new XMLHttpRequest();
+
+		xhttp.overrideMimeType( 'text/plain' );
+
 		xhttp.onreadystatechange = function() {
 			if ( this.readyState == 4 ) {
 				if ( this.status == 200) {
@@ -172,24 +174,25 @@ class ShadyLady {
 
 		this.logger.debug( 'GET: ' + file );
 		xhttp.open('GET', file + '?' + new Date().getTime(), true );
+
 		try {
 			xhttp.send();
 		} catch( e ) {
-			console.error( 'ERROR: when loading', file, e );
+			this.logger.error( 'when loading ' + file + ': ' + e );
 		}
 	}
 
 	parseFile( file, src ) {
-		let entry = this.files[ file ];
+		const entry = this.files[ file ];
 		entry.loaded = true;
 		entry.src = src;
 		entry.hash = ShadyLadyUtil.hashText( src );
 
-		let lines = src.split('\n');
+		const lines = src.split('\n');
 		lines.forEach(line=>{
 			if ( /^#include/.test(line)) {
-				let name = line.trim().replace(/.*\s/,'');
-				let include = this.resolveIncludePath( file, name );
+				const name = line.trim().replace(/.*\s/,'');
+				const include = this.resolveIncludePath( file, name );
 				this.addFile( include );
 				entry.includes[ include ] = 1
 				entry.resolutions[ name ] = include;
@@ -214,6 +217,7 @@ class ShadyLady {
 		return path;
 	}
 
+	// revisit this, even I find it too confusing... >_<
 	handleIncludes() {
 		for ( let i = 0 ; i < 33 ; i++ ) {
 			let resolved = 0;
@@ -224,6 +228,7 @@ class ShadyLady {
 		this.throwShade();
 	};
 
+	// revisit this, even I find it too confusing... >_<
 	resolveInclude( file, resolved ) {
 		let entry = this.files[ file ];
 		let includes = Object.keys( entry.includes );
@@ -231,7 +236,7 @@ class ShadyLady {
 			return;
 		}
 
-		this.logger.debug( file + ' needs to have ' + includes.join( ', ' ) );
+		//this.logger.debug( file + ' needs to have ' + includes.join( ', ' ) );
 
 		let resolvable = true;
 		includes.forEach( include => {
@@ -239,7 +244,12 @@ class ShadyLady {
 			resolvable = resolvable && isResolved;
 		});
 
-		if ( !resolvable ) return;
+		if ( !resolvable ) {
+			//this.logger.debug( 'cannot resolve all includes for ' + file );
+			return;
+		} else {
+			//this.logger.debug( 'can now resolve all includes for ' + file );
+		}
 		resolved++;
 
 		let nuLines = [];
@@ -251,11 +261,10 @@ class ShadyLady {
 				let include = entry.resolutions[ name ];
 
 				this.files[include].resolved.split('\n').forEach((line,lineNumber)=>{
-					line = line.replace( /\s*$/, '' );
+					line = line.replace( /\s+$/, '' );
 					if ( line.length && !/\\/.test(line) ) {
 						let length = ( '' + line ) .replace(/\t/g, '    ').length;
 						for ( let i = 0 ; i < 80 - length ; i++ ) line += ' ';
-
 						nuLines.push( line + ' // ' + name + '?' + (lineNumber + 1) );
 					} else {
 						nuLines.push( line );
@@ -382,7 +391,8 @@ class ShadyLady {
 	}
 
 	setupTextures() {
-		this.textures = [];
+		this.context.textures = this.textures = new Map();
+		if( !this.config.textures ) return;
 
 		let id = this.context.gl.TEXTURE0;
 		Object.keys( this.config.textures ).forEach( name => {
@@ -422,12 +432,12 @@ class ShadyLady {
 						thiz.setupTexture( name, id, video );
 					});
 				})
-				.catch( function( err ) { thiz.error( 'could not get camera access:' +  err ) } )
+				.catch( function( err ) { thiz.logger.error( 'could not get camera access: ' +  err ) } )
 			;
 		} catch ( e ) {
-			this.error( 'error getting camera: ' + e );
+			this.logger.error( 'error getting camera: ' + e );
 			if ( !/^https:/.test( document.location.toString() ) ) {
-				this.warn( 'note: frequently webcam is only avaible on sites with https...' );
+				this.logger.warn( 'note: frequently webcam is only avaible on sites with https...' );
 			}
 		}
 	}
@@ -437,7 +447,8 @@ class ShadyLady {
 		const program = this.context.program;
 
 		const texture = gl.createTexture();
-        gl.bindTexture( gl.TEXTURE_2D, texture );
+	
+		gl.bindTexture( gl.TEXTURE_2D, texture );
         gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, true );
         gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
         gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
@@ -448,12 +459,19 @@ class ShadyLady {
 
 		this.logger.debug( `bind texture ${name} to ${id} (${uniformId})` );
 
-		this.textures.push( () => {
-			const gl = this.context.gl;
-			gl.activeTexture( id );
-			gl.bindTexture( gl.TEXTURE_2D, texture );
-			gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image );
-		});
+		this.textures.set(
+			name,
+			{
+				id:id,
+				element:image,
+				update: () => {
+				const gl = this.context.gl;
+					gl.activeTexture( id );
+					gl.bindTexture( gl.TEXTURE_2D, texture );
+					gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image );
+				}
+			}
+		);
 
 		return texture;
 	}
@@ -529,7 +547,6 @@ class ShadyLady {
 			}
 			setTimeout( redraw, timeout );
 		};
-
 		draw();
 	}
 
@@ -543,7 +560,10 @@ class ShadyLady {
 
 		this.updateUniforms();
 		this.updateTextures();
+		this.triangles();
+	}
 
+	triangles() {
 		const gl = this.context.gl;
 		gl.drawArrays( gl.TRIANGLES, 0,  3 );
 	}
@@ -551,7 +571,9 @@ class ShadyLady {
 	updateUniforms() {
 		for( const [name,uniform] of this.context.uniforms.entries() ) {
 			const handler = this.config.uniforms[ name ];
-			this.updateUniform( uniform, handler( this ) );
+			if ( handler ) {
+				this.updateUniform( uniform, handler( this ) );
+			} // otherwise the user has to deal with it..
 		}
 	}
 
@@ -562,12 +584,14 @@ class ShadyLady {
 			case 2:  gl.uniform2fv( uniform, value ); break;
 			case 3:  gl.uniform3fv( uniform, value ); break;
 			case 4:  gl.uniform4fv( uniform, value ); break;
-			default: gl.uniform1f( uniform, value );
+			default: gl.uniform1f( uniform, value, value.length );
 		}
 	}
 
 	updateTextures() {
-		this.textures.forEach( cb => cb() );
+		for( const [name,textureInfo] of this.textures.entries() ) {
+			textureInfo.update( this );
+		}
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -669,7 +693,12 @@ class ShadyLadyUtil {
 	}
 
 	static fromHtmlElement( element = document.body, clear = true ) {
-		const body = ShadyLadyUtil.htmlDecode( element.innerHTML );
+		const body = ShadyLadyUtil
+			.htmlDecode( element.innerHTML )
+			.split( '\n' )
+			.map( line => line.trim() )
+			.join( '\n' )
+		;
 		if ( clear ) {
 			element.innerHTML = '';
 		}
@@ -745,8 +774,7 @@ class ShadyLadyUtil {
 
 	static hashText = ( txt ) => {
 		return ShadyLadyUtil.sha256(txt);
-
-		/* note window.crypto.subtle.digest only works for https hosting >_< */
+		/* note window.crypto.subtle.digest only works for https hosting >_< 
 		const data = new TextEncoder.encode(txt);
 		window.crypto.subtle.digest('SHA-256', data).then(
 			hash => {
@@ -755,6 +783,7 @@ class ShadyLadyUtil {
 				console.log('hash is ' +  hash );
 			}
 		).catch(err => { console.log(err) });
+		*/
 	}
 
 	/* from https://geraintluff.github.io/sha256/ */
