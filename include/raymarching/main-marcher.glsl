@@ -34,6 +34,7 @@ vec3 mainMarcher( vec2 uv ) {
 	return colorMiss( uv, eye, direction, d );
 }
 
+#ifndef GOT_MAIN
 void main() {
 	vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
 	#ifdef AA
@@ -46,3 +47,4 @@ void main() {
 		fragColor = vec4( mainMarcher(uv),1.);
 	#endif
 }
+#endif
