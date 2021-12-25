@@ -3,155 +3,15 @@
 
 	<SCRIPT TYPE="text/javascript" SRC="../js/throw-shade.js"></SCRIPT>
 
+	<!-- TODO: try to simplify these 2 million includes... :-/ -->
 	<SCRIPT TYPE="text/javascript" SRC="../js/ml/tensorflow/facemesh/tf-core.js"></SCRIPT>
 	<SCRIPT TYPE="text/javascript" SRC="../js/ml/tensorflow/facemesh/tf-converter.js"></SCRIPT>
 	<SCRIPT TYPE="text/javascript" SRC="../js/ml/tensorflow/facemesh/tf-backend-cpu.js"></SCRIPT>
 	<SCRIPT TYPE="text/javascript" SRC="../js/ml/tensorflow/facemesh/tf-backend-webgl.js"></SCRIPT>
 	<SCRIPT TYPE="text/javascript" SRC="../js/ml/tensorflow/facemesh/face-landmarks-detection.js"></SCRIPT>
-
-	<SCRIPT TYPE="text/javascript">
-		const FACE_MESH_POINT_COUNT = 468;
-		const FACE_MESH_ARRAY_SIZE = 3 * FACE_MESH_POINT_COUNT; 
-		const FACE_MESH_MINIMUM_CONFIDENCE = .1;
-		const FACE_MESH_DATA = new Float32Array( new Array( FACE_MESH_ARRAY_SIZE ).fill( .66 ) );
-
-		let shadyLady = false;
-		let video = false;
-		let model = false;
-		let last = 0;
-
-		const SHADY = {
-			canvas:   () => ShadyLadyUtil.firstCanvas(),
-			fragment: () => ShadyLadyUtil.fromHtmlElement( ShadyLadyUtil.firstCanvas() ),
-			uniforms: { facemesh: null },
-			textures: { webcam: 'webcam' },
-			draw: ( sl ) => shadyLady = sl 
-		};
-
-		const getValue = ( id ) => {
-			const v = parseFloat( ShadyLadyUtil.byId( id ).value );
-			ShadyLadyUtil.byId( id + 'Label' ).innerHTML = v;
-			return v;
-		}
-
-		faceLandmarksDetection.load( faceLandmarksDetection.SupportedPackages.mediapipeFacemesh ).then( (m) => { 
-			console.log( 'loaded facemesh model', m ); 
-			model = m;
-			detectFace();
-		} );
-
-		const detectFace = () => {
-			if( video ) {
-				model.estimateFaces({input:video})
-				.then( ( predictions ) => {
-					if ( !predictions.length || predictions[ 0 ].faceInViewConfidence < FACE_MESH_MINIMUM_CONFIDENCE) {
-						shadyLady.updateTextures();
-						shadyLady.triangles();
-						return;
-					} 
-					onPredictions( predictions );
-				})
-			} else {
-				if ( shadyLady ) {
-					const webcam = shadyLady.context.textures.get( 'webcam' );
-					if ( webcam ) {
-						video = webcam.element;
-						shadyLady.logger.info( 'got video for facemesh' );
-					}
-				}
-			}
-			setTimeout( () => { window.requestAnimationFrame( detectFace ) }, 1000 / 33 );
-		};
-
-		const onPredictions = ( predictions ) => {
-			const mesh = predictions[ 0 ].scaledMesh;
-
-			const xOffset = getValue( 'xOffset' );
-			const yOffset = getValue( 'yOffset' );
-			const xScale  = getValue( 'xScale' );
-			const yScale  = getValue( 'yScale' );
-
-			/* this mapping is bizarre... */
-
-			let index = 0;
-
-			mesh.forEach( point => {
-				FACE_MESH_DATA[ index++ ] = xOffset + xScale * point[ 0 ];
-				FACE_MESH_DATA[ index++ ] = 1. - ( yOffset + yScale * point[ 1 ] );
-				FACE_MESH_DATA[ index++ ] = point[ 2 ];
-			});
-
-			/* update the shader */
-
-			const uniform = shadyLady.context.uniforms.get( 'facemesh' );
-			shadyLady.context.gl.uniform3fv( uniform, FACE_MESH_DATA, FACE_MESH_POINT_COUNT );
-
-			shadyLady.updateUniforms();
-			shadyLady.updateTextures();
-			shadyLady.triangles();
-
-			/* this fps stuff should be in ShadyLady... */
-
-			const n = 100;
-			if ( 0 === shadyLady.controls.frameCount % n ) {
-				const now = shadyLady.controls.currentTime;
-				let diff = now - last;
-				console.log( n / diff, 'fps' );
-				last = now;
-			}
-		};
-   	</SCRIPT>
-	<STYLE>
-		section {
-			display: block;
-			width:96%;
-		}
-		control {
-			display: inline-block;
-			width:48%;
-		}
-		label {
-			display: inline-block;
-			width:3.5em;
-		}
-		span {
-			display: inline-block;
-			width:4em;
-		}
-		input {
-			display: inline-block;
-			width:11em;
-		}
-	</STYLE>
+	<SCRIPT TYPE="text/javascript" SRC="../js/ml/tensorflow/facemesh/demo.js"></SCRIPT>
 </HEAD>
 <HTML><BODY>
-	<controls>
-		<section>
-			<control>
-				<label>xScale:</label>
-				<span id="xScaleLabel" ></span>
-				<input type="range" id="xScale"  step=".0001" min="0"  max=".004" value=".0022">
-			</control>
-			<control>
-				<label>xOffset:</label>
-				<span id="xOffsetLabel"></span>
-				<input type="range" id="xOffset" step=".0001" min="-1" max="1" value="-.7105">
-			</control>
-		</section>
-		<section>
-			<control>
-				<label>yScale:</label>
-				<span id="yScaleLabel" ></span>
-				<input type="range" id="yScale"  step=".0001" min="0"  max=".004" value=".0021">
-			</control>
-			<control>
-				<label>yOffset:</label>
-				<span id="yOffsetLabel"></span>
-				<input type="range" id="yOffset" step=".0001" min="-1" max="1" value="0.4931">
-			</control>
-		</section>
-	</controls>
-
 	<canvas width="640" height="480">
 		#include es300-boilerplate.frag
 		#include uniforms.frag

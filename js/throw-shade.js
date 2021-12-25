@@ -1,5 +1,10 @@
 window.addEventListener('load', ()=>{
-	new ShadyLady();
+	if ( 'undefined' === typeof( SHADY_MANUAL ) ) {
+		const config = 'undefined' === typeof( SHADY ) ? null : SHADY;
+		new ShadyLady( config );
+	} else {
+		console.log( 'ShadyLady is in manual' );
+	}
 });
 
 class ShadyLady {
@@ -10,9 +15,9 @@ class ShadyLady {
 
 	/* ------------------------------------------------------------------ */
 
-	constructor() {
+	constructor( config = null ) {
 		this.logger = new ShadyLadyLogger();
-		this.load();
+		this.load( config );
 	};
 
 	getDefaultConfig() {
@@ -32,12 +37,11 @@ class ShadyLady {
 		};
 	}
 
-	load() {
-		// try to pull "SHADY" from the global scope...
-		if( 'undefined' === typeof( SHADY ) ) {
-			this.config = this.getDefaultConfig();
+	load( config = null ) {
+		if( config ) {
+			this.config = this.mergeConfig( config, this.getDefaultConfig() );
 		} else {
-			this.config = this.mergeConfig( SHADY );
+			this.config = this.getDefaultConfig();
 		}
 		this.logger = new ShadyLadyLogger( this.config.logLevel );
 
@@ -93,12 +97,11 @@ class ShadyLady {
 		this.loadFiles();
 	}
 
-	mergeConfig( config ) {
-		const def = this.getDefaultConfig();
-		Object.keys( def ).forEach( k=>{ 
+	mergeConfig( config, defaults ) {
+		Object.keys( defaults ).forEach( k=>{ 
 			if( k in config ) {
 				const current = config[ k ];
-				const previous = def[ k ];
+				const previous = defaults[ k ];
 				if ( Array.isArray( current ) ) {
 					config[ k ] = [...previous,...current];
 				} else {
@@ -109,7 +112,7 @@ class ShadyLady {
 					}
 				}
 			} else {
-				config[ k ] = def[ k ];
+				config[ k ] = defaults[ k ];
 			}
 		});
 		return config;
@@ -551,13 +554,22 @@ class ShadyLady {
 	}
 
 	draw() {
+		if( this.config.draw ) {
+			if ( this.config.draw( this ) ) {
+				return;
+			}
+		} 
+
+		this.frame();
+	}
+
+	updateTimer() {
 		this.controls.currentTime = ShadyLadyUtil.now();
 		this.controls.frameCount++;
+	}
 
-		if( this.config.draw && this.config.draw( this ) ) {
-			return;
-		}
-
+	frame() {
+		this.updateTimer();
 		this.updateUniforms();
 		this.updateTextures();
 		this.triangles();
@@ -572,12 +584,14 @@ class ShadyLady {
 		for( const [name,uniform] of this.context.uniforms.entries() ) {
 			const handler = this.config.uniforms[ name ];
 			if ( handler ) {
-				this.updateUniform( uniform, handler( this ) );
+				this.updateUniform( uniform, handler( this, uniform ) );
 			} // otherwise the user has to deal with it..
 		}
 	}
 
 	updateUniform( uniform, value ) {
+		if ( !uniform || !value ) return;
+
 		const gl = this.context.gl;
 		switch ( value.length ) {
 			case 1:  gl.uniform1fv( uniform, value ); break;
@@ -770,6 +784,10 @@ class ShadyLadyUtil {
 
 	static isFunction( f ) {
 		return 'function' === typeof( f );
+	}
+
+	static isUndefined( f ) {
+		return ( 'undefined' === typeof( f ) );
 	}
 
 	static hashText = ( txt ) => {
