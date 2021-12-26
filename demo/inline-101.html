@@ -1,63 +1,64 @@
-<HTML><HEAD>
-	<SCRIPT TYPE="text/javascript" SRC="../js/throw-shade.js"></SCRIPT>
-	<SCRIPT TYPE="text/javascript">
-		// simple example of using inline code
-		const SHADY = {
-			canvas:   () => ShadyLadyUtil.firstCanvas(),
-			fragment: () => ShadyLadyUtil.fromHtmlElement( ShadyLadyUtil.firstCanvas() ),
-			uniforms: {
-				example: ( shadyLady ) => {
-					const t = shadyLady.controls.currentTime * .7;
-					return [Math.cos(t),Math.sin(t)].map( v => v *.5 );
+<HTML>
+	<HEAD>
+		<META http-equiv="Content-Type" content="text/html; charset=ISO-8859-5">
+
+		<SCRIPT TYPE="text/javascript" SRC="../js/throw-shade.js"></SCRIPT>
+		<SCRIPT TYPE="text/javascript">
+			const SHADY = {
+				uniforms: {
+					example: ( shadyLady ) => {
+						const t = shadyLady.controls.currentTime * .7;
+						return [Math.cos(t),Math.sin(t)].map( v => v *.5 );
+					}
+					,idk: ( shadyLady ) => {
+						const t = shadyLady.controls.currentTime;
+						return t; // value never changes! why???
+						return Math.cos(t) * .0 + 1. * t; // 
+						return Math.cos(t) + 0.01 * t; // jumps around somehow...
+						return ( Math.cos(t) + 1 ) * 2.; // this works...
+					}
+				},
+				textures: {
+					xShadyLady: '../images/42-97385_3O-X_SHADY_LADY.jpg',
+					webcam: 'webcam'
 				}
-				,idk: ( shadyLady ) => {
-					const t = shadyLady.controls.currentTime;
-					return t; // value never changes! why???
-					return Math.cos(t) * .0 + 1. * t; // 
-					return Math.cos(t) + 0.01 * t; // jumps around somehow...
-					return ( Math.cos(t) + 1 ) * 2.; // this works...
-				}
-			},
-			textures: {
-				xShadyLady: '../images/42-97385_3O-X_SHADY_LADY.jpg',
-				webcam: 'webcam'
-			}
-		};
-   	</SCRIPT>
-</HEAD>
-<HTML><BODY>
-<canvas width="640" height="480">
-#include es300-boilerplate.frag
-#include uniforms.frag
-#include functions/langth.glsl
-#include functions/outline.glsl
+			};
+		</SCRIPT>
+	</HEAD>
+	<BODY>
+		<shady width="640" height="480">
+		#include es300-boilerplate.frag
+		#include uniforms.frag
+		#include functions/langth.glsl
+		#include functions/outline.glsl
 
-uniform vec2 example;
-uniform float idk;
+		uniform vec2 example;
+		uniform float idk;
 
-/* matches key in config.textures */
-uniform sampler2D xShadyLady;
-uniform sampler2D webcam;
+		/* matches key in config.textures */
+		uniform sampler2D xShadyLady;
+		uniform sampler2D webcam;
 
-void main() {
-    vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
-	vec2 moving = uv - example; 
+		void main() {
+			vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
+			vec2 moving = uv - example; 
 
-	float f = iTime; // for some reason, this is not updating...
-	moving -= vec2( cos(f), sin(f) ) * .2;
+			float f = iTime; // for some reason, this is not updating...
+			moving -= vec2( cos(f), sin(f) ) * .2;
 
-	float thickness = .007 + cos( iTime ) * .003;
-	vec4 moved = vec4(
-		outline( .05, thickness, length( moving.xy ) ),
-		outline( .05, thickness, langth( moving.xy ) ),
-		outline( .05, thickness, langth( moving.xyx ) ),
-		1.
-	);
+			float thickness = .007 + cos( iTime ) * .003;
+			vec4 moved = vec4(
+				outline( .05, thickness, length( moving.xy ) ),
+				outline( .05, thickness, langth( moving.xy ) ),
+				outline( .05, thickness, langth( moving.xyx ) ),
+				1.
+			);
 
-	vec4 sl = texture( xShadyLady, uv * vec2( .66, 1. ) + vec2( 0.5 ) );
-	vec4 wc = texture( webcam, uv * vec2( .66, 1. ) * 1.5 + vec2( 0.5 ) );
+			vec4 sl = texture( xShadyLady, uv * vec2( .66, 1. ) + vec2( 0.5 ) );
+			vec4 wc = texture( webcam, uv * vec2( .66, 1. ) * 1.5 + vec2( 0.5 ) );
 
-	fragColor = max( .2 * sl + .8 * wc, moved );
-}
-</canvas>
-</BODY></HTML>
+			fragColor = max( .2 * sl + .8 * wc, moved );
+		}
+		</shady>
+	</BODY>
+</HTML>

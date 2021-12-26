@@ -101,8 +101,6 @@ class FaceMesher {
 class FaceMeshDemo {
 	constructor() {
 		const shadyLadyConfig = {
-			canvas:   () => ShadyLadyUtil.firstCanvas(),
-			fragment: () => ShadyLadyUtil.fromHtmlElement( ShadyLadyUtil.firstCanvas() ),
 			uniforms: { facemesh: ( shadyLady, uniform ) => null },
 			textures: { webcam: 'webcam' },
 			draw: ( shadyLady ) => false

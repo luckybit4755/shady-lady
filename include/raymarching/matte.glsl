@@ -5,8 +5,8 @@ vec3 getColor(const float f) {
 	return COLORS[int(f)];
 }
 
-#ifndef GOT_COLOR_HIT
-#define GOT_COLOR_HIT
+#ifndef COLOR_HIT
+#define COLOR_HIT
 vec3 colorHit( vec2 uv, vec3 eye, vec3 direction, vec2 d, vec3 p, vec3 n ) {
 	return getColor( d.x );
 	vec3 light = 1.2 * vec3( cos(iTime), 1., sin(iTime));
@@ -23,8 +23,8 @@ vec3 colorHit( vec2 uv, vec3 eye, vec3 direction, vec2 d, vec3 p, vec3 n ) {
 }
 #endif
 
-#ifndef GOT_COLOR_MISS
-#define GOT_COLOR_MISS
+#ifndef COLOR_MISS
+#define COLOR_MISS
 vec3 colorMiss( vec2 uv, vec3 eye, vec3 direction, vec2 d ) {
 	return max( uv.xyx * .33 + abs(cos(iTime)) * .44, vec3( .1 ) );
 }

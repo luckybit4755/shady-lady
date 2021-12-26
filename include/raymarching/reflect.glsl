@@ -1,9 +1,3 @@
-#include es300-boilerplate.frag
-#include uniforms.frag
-
-#include raymarching/main-marcher.glsl
-#include raymarching/example-map.glsl
-
 const vec2 HILO = vec2( 1., .01 );
 const vec3 COLORS[] = vec3[]( HILO.yyy, HILO.xyy, HILO.yxy, HILO.yyx, HILO.xyx);
 

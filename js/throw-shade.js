@@ -54,30 +54,41 @@ class ShadyLady {
 		) + 'include/';
 
 		let name = this.loca.substring( this.root.length ).replace(/^html/, '' ).replace(/\.html$/,'' );
-		this.fragment = this.root + name + '.frag';
-
-		this.logger.info( 'root:' + this.root );
-		this.logger.info( 'name:' + name );
-		this.logger.info( 'frag:' + this.fragment );
-		this.logger.info( 'incl:' + this.includeRoot );
-
-		if ( 'fragment' in this.config ) {
-			this.fragment = this.config.fragment;
-
-			// otherwise, should be a filename... I guess...
-			if ( ShadyLadyUtil.isFunction( this.fragment ) ) {
-				this.logger.info( 'fragment contents are procedural, rather than file based' );
-				this.body = this.fragment( this );
-				this.fragment = ShadyLady.BODY;
-			} else {
-				this.logger.info( 'fragment filename is ' + this.fragment );
-			}
-		}
+		//this.fragment = this.root + name + '.frag';
 
 		this.files = {};
 		this.ui = ShadyLadyUtil.nullObject( ShadyLady.UI_KEYS );
 		this.context = ShadyLadyUtil.nullObject( ShadyLady.CONTEXT_KEYS );
 		this.controls = ShadyLadyUtil.nullObject( ShadyLady.CONTROL_KEYS );
+
+		if ( 'fragment' in this.config ) {
+			this.fragment = this.config.fragment;
+
+			if ( ShadyLadyUtil.isFunction( this.fragment ) ) {
+				this.logger.info( 'fragment contents are procedural, rather than file based' );
+				this.body = this.fragment( this );
+				this.fragment = ShadyLady.BODY;
+			} else {
+				// otherwise, should be a filename... I guess...
+				this.logger.info( 'fragment filename is ' + this.fragment );
+			}
+		} else {
+			// make the default to pull from the <shady> tag...
+			const shadyElement = ShadyLadyUtil.firstShady();
+			if ( shadyElement ) {
+				this.body = ShadyLadyUtil.fromHtmlElement( shadyElement );
+				this.fragment = ShadyLady.BODY;
+				this.config.canvas = this.createCanvas();
+				shadyElement.parentNode.replaceChild( this.config.canvas, shadyElement );
+			} else {
+				throw 'missing tag <shady>';
+			}
+		}
+
+		this.logger.info( 'root:' + this.root );
+		this.logger.info( 'name:' + name );
+		this.logger.info( 'frag:' + this.fragment );
+		this.logger.info( 'incl:' + this.includeRoot );
 
 		this.addFile( this.fragment );
 
@@ -614,9 +625,7 @@ class ShadyLady {
 		this.addElement( 'style', 'style', this.config.style, document.head );
 		this.addElement( 'canvasContainer' );
 
-		let canvas = this.addElement( 'canvas', 'canvas', false, this.ui.canvasContainer );
-		canvas.setAttribute( 'width', this.config.width );
-		canvas.setAttribute( 'height', this.config.height );
+		const canvas = this.createCanvas( this.ui.canvasContainer );
 
 		this.addElement( 'controlContainer' );
 		this.addElement( 'fullscreen', 'button', 'fullscreen', this.ui.controlContainer );
@@ -638,15 +647,24 @@ class ShadyLady {
 		});
 	}
 
-	addElement( name, type='div', text = false, parent = document.body ) {
-		let element = document.createElement( type );
+	createCanvas( container = null ) {
+		const canvas = this.addElement( 'canvas', 'canvas', null, container );
+		canvas.setAttribute( 'width', this.config.width );
+		canvas.setAttribute( 'height', this.config.height );
+		return canvas;
+	}
+
+	addElement( name, type='div', text = null, parent = document.body ) {
+		const element = document.createElement( type );
 		element.setAttribute( 'id', name );
 		element.setAttribute( 'name', name );
 		element.setAttribute( 'shady', 'af' );
 		if ( text ) {
 			element.appendChild( document.createTextNode( text ) );
 		}
-		parent.appendChild( element );
+		if ( parent ) {
+			parent.appendChild( element );
+		}
 		return this.ui[ name ] = element;
 	}
 }
@@ -738,6 +756,9 @@ class ShadyLadyUtil {
 	}
 	static firstCanvas() {
 		return ShadyLadyUtil.byTag( 'canvas' )[ 0 ];
+	}
+	static firstShady() {
+		return ShadyLadyUtil.byTag( 'shady' )[ 0 ];
 	}
 
 	static cumulativeOffset( element ) {
