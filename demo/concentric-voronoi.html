@@ -1,0 +1,143 @@
+<HTML>
+	<HEAD>
+		<META http-equiv="Content-Type" content="text/html; charset=ISO-8859-5">
+
+		<SCRIPT TYPE="text/javascript" SRC="../js/throw-shade.js"></SCRIPT>
+		<SCRIPT TYPE="text/javascript">
+			const SHADY_MANUAL = true;
+			
+			const ranger = () => {
+				const uniforms = {};
+				const ranges = ShadyLadyUtil.byTag( 'range' );
+
+				for ( let i = 0 ; i < ranges.length ; i++ ) {
+					const range = ranges[ i ];
+					const settings = range.attributes[ 0 ];
+					const input = document.createElement( 'input' );
+					input.setAttribute( 'type', 'range' );
+
+					const info = settings.nodeValue.replace( /@/g, ':' ).split( ':' ).map( v => parseFloat( v ) );
+					while ( info.length < 3 ) info.push( info[ 0 ] );
+					const attributes = { id:settings.nodeName, min: info[ 0 ], max: info[ 1 ], value: info[ 2 ] };
+					attributes.step = ( attributes.max - attributes.min ) / 100.;
+
+					for ( const [k,v] of Object.entries( attributes ) ) {
+						input.setAttribute( k, v );
+					}
+
+					const container = document.createElement( 'div' );
+					const label = document.createElement( 'span' );
+					const value = document.createElement( 'span' );
+					label.style.display = 'inline-block';
+					value.style.display = 'inline-block';
+					label.style.width = '4em';
+					value.style.width = '4em';
+
+					label.appendChild( document.createTextNode( attributes.id ) );
+					value.appendChild( document.createTextNode( attributes.value ) );
+
+					container.appendChild( label );
+					container.appendChild( value );
+					container.appendChild( input );
+
+					range.appendChild( container );
+
+					uniforms[ attributes.id ] = () => attributes.value;
+
+					input.addEventListener( 'input', () => {
+						value.innerHTML = attributes.value = parseFloat( input.value );
+					});
+				}
+
+				return uniforms;
+			};
+
+			window.addEventListener('load', () => {
+				const config = { uniforms: ranger() };
+				let timer = 0;
+				config.uniforms.u_time = () => timer += 0.001;
+				const shadyLady = new ShadyLady( config );
+			});
+
+	   	</SCRIPT>
+	</HEAD>
+	<BODY>
+		<range u_mod="0:1:.11"></range>
+		<range u_minus="-1:1:.0"></range>
+
+		<range u_min="0:.2:.05"></range>
+		<range u_max="0:.2:.0"></range>
+		<range u_add="-1:1:0"></range>
+		<range u_sux="-1:1:1"></range>
+
+		<range u_min2="0:.2:.04"></range>
+		<range u_max2="0:.2:.0"></range>
+		<range u_add2="-1:1:0"></range>
+		<range u_sux2="-1:1:1"></range>
+
+		<range u_aaa=".01:.13:.0940"></range>
+		<range u_bbb=".01:.13:.0520"></range>
+<!--
+		<range u_mod="0:.1@.031"/>
+		<range u_min="0:.1@.081"/>
+		<range u_max="0:.1@.028"/>
+		<range u_add="0:.1@.040"/>
+		<range u_minus="0:1@.040"/>
+-->
+		<SHADY>
+			#include es300-boilerplate.frag
+			#include uniforms.frag
+
+			uniform float u_mod;
+			uniform float u_minus;
+
+			uniform float u_time;
+
+			uniform float u_min;
+			uniform float u_max;
+			uniform float u_add;
+			uniform float u_sux;
+
+			uniform float u_min2;
+			uniform float u_max2;
+			uniform float u_add2;
+			uniform float u_sux2;
+
+			uniform float u_aaa;
+			uniform float u_bbb;
+			
+			void main() {
+				vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
+
+				float q = .11;
+				float w = mod( length( uv ) - u_time, q );
+				float h = mod( length( uv ) - u_time - .5 * q, q );
+				fragColor = vec4( vec3( w, h, 0 ), 1. );
+				fragColor = vec4( vec3( w-h ), 1. );
+				fragColor = vec4( vec3( max(w,h) ), 1. );
+				fragColor = vec4( vec3( min(w,h) ), 1. );
+				fragColor = vec4( vec3( w+h ), 1. );
+
+				float f = smoothstep( u_aaa, u_bbb, w );//+h );
+				f = 1. -f;
+				fragColor = vec4( vec3( f ), 1. );
+
+
+				return;
+
+			//	float m = mod( dot( uv, uv ) - u_minus - u_time, u_mod );
+				float m = mod( dot( uv, uv ) - .0 - u_time, u_mod );
+
+				float r = u_sux * smoothstep( u_min, u_max, m + u_add ) ;
+
+				float m2 = mod( u_minus - dot( uv, uv ) - u_time, u_mod );
+				float g = u_sux2 * smoothstep( u_min2, u_max2, m2 + u_add2 );
+
+				//r += g;
+
+				fragColor = vec4( vec3( r, g, .0 ), 1. );
+				fragColor = vec4( vec3( r+g ), 1. );
+			}
+		</SHADY>
+	</BODY>
+</HTML>
