@@ -13,6 +13,8 @@
 
 			window.addEventListener('load', () => {
 				const config = { uniforms: ShadyLadyUtil.createRanges({
+					u1:'0,1,.04',
+					u2:'0,1,.12'
 				},ShadyLadyUtil.firstTag('ranges'))};
 
 				const shadyLady = new ShadyLady( config );
@@ -26,9 +28,11 @@
 			#include es300-boilerplate.frag
 			#include uniforms.frag
 
+			uniform float u1, u2;
+
 			float circle( vec2 uv, float moddo ) {
 				float q = .11;
-				float t = mod( .1 * iTime, 1000. * moddo );
+				float t = mod( .05 * iTime, 1000. * moddo );
 
 				float w = mod( length( uv ) - t, moddo );
 				return 1. - smoothstep( .0940, .0520, w );
@@ -136,7 +140,15 @@ n.yz = vec2( +1., +1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x )
 				fragColor = vec4( uk.xyx * c - ug.xyx * c, 1. );
 
 				float o = circle( uv + v3.yz, .15 );
-				fragColor = vec4( vec3( o, o, o ) * uk.x, 1. );
+				fragColor = vec4( vec3( o ) * uk.x, 1. );
+
+				float rl = 1.-pow(dot( uv,uv ),.3);
+				fragColor = vec4( vec3( rl ) , 1. );
+				fragColor = vec4( rl * vec3( o ), 1. );
+
+
+				float p = circle( v3.yz * u1, u2 );
+				fragColor = vec4( vec3( p ), 1. );
 			}
 		</SHADY>
 	</BODY>
