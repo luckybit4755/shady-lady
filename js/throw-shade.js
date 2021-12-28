@@ -570,12 +570,11 @@ class ShadyLady {
 				return;
 			}
 		} 
-
 		this.frame();
 	}
 
 	updateTimer() {
-		this.controls.currentTime = ShadyLadyUtil.now();
+		this.controls.currentTime = ShadyLadyUtil.now() - this.controls.startTime;
 		this.controls.frameCount++;
 	}
 
@@ -595,15 +594,19 @@ class ShadyLady {
 		for( const [name,uniform] of this.context.uniforms.entries() ) {
 			const handler = this.config.uniforms[ name ];
 			if ( handler ) {
-				this.updateUniform( uniform, handler( this, uniform ) );
+				this.updateUniform( name, uniform, handler( this, uniform ) );
 			} // otherwise the user has to deal with it..
 		}
 	}
 
-	updateUniform( uniform, value ) {
+	updateUniform( name, uniform, value ) {
 		if ( !uniform || !value ) return;
 
 		const gl = this.context.gl;
+		if ( !value.length ) {
+			return gl.uniform1f( uniform, value );
+		}
+
 		switch ( value.length ) {
 			case 1:  gl.uniform1fv( uniform, value ); break;
 			case 2:  gl.uniform2fv( uniform, value ); break;
@@ -771,6 +774,61 @@ class ShadyLadyUtil {
 
 		return { top: top, left: left };
 	}
+		
+	// {u_name:'min:max:value'} for binding to float uniform	
+	static createRanges( rangers, target = document.body ) {
+		const uniforms = {};
+		const ranges = ShadyLadyUtil.byTag( 'range' );
+		for ( const[id,settings] of Object.entries( rangers ) ) {
+			const info = settings
+				.trim()
+				.replace( /[:@|, \t]+/g, ',' )
+				.split( ',' )
+				.map( v => parseFloat( v ) );
+			while ( info.length < 3 ) info.push( info[ 0 ] );
+
+			const attributes = {id:id};
+			info.forEach( (v,i) => {
+				switch( i ) {
+					case 0: attributes.min = v; break;
+					case 1: attributes.max = v; break;
+					case 2: attributes.value = v; break;
+				}
+			});
+			attributes.step = ( attributes.max - attributes.min ) / 100.;
+
+			const input = document.createElement( 'input' );
+			input.setAttribute( 'type', 'range' );
+
+			for ( const [k,v] of Object.entries( attributes ) ) {
+				input.setAttribute( k, v );
+			}
+			input.addEventListener( 'input', () => {
+				value.innerHTML = attributes.value = parseFloat( input.value );
+			});
+
+			const container = document.createElement( 'div' );
+			const label = document.createElement( 'span' );
+			const value = document.createElement( 'span' );
+			label.style.display = 'inline-block';
+			value.style.display = 'inline-block';
+			label.style.width = '4em';
+			value.style.width = '4em';
+
+			label.appendChild( document.createTextNode( attributes.id ) );
+			value.appendChild( document.createTextNode( attributes.value ) );
+
+			container.appendChild( label );
+			container.appendChild( value );
+			container.appendChild( input );
+
+			target.appendChild( container );
+
+			uniforms[ attributes.id ] = () => attributes.value;
+		}
+
+		return uniforms;
+	};
 
 	static trimLastPathSection( url ) {
 	   return url.replace( /\/[^\/]*$/, '/' );

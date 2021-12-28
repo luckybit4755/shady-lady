@@ -2,141 +2,141 @@
 	<HEAD>
 		<META http-equiv="Content-Type" content="text/html; charset=ISO-8859-5">
 
+		<!-- 
+		https://www.youtube.com/watch?v=nT_Oaz1fSEc
+		https://www.youtube.com/watch?v=_bdcQXMQ4e0
+		-->
+
 		<SCRIPT TYPE="text/javascript" SRC="../js/throw-shade.js"></SCRIPT>
 		<SCRIPT TYPE="text/javascript">
 			const SHADY_MANUAL = true;
-			
-			const ranger = () => {
-				const uniforms = {};
-				const ranges = ShadyLadyUtil.byTag( 'range' );
-
-				for ( let i = 0 ; i < ranges.length ; i++ ) {
-					const range = ranges[ i ];
-					const settings = range.attributes[ 0 ];
-					const input = document.createElement( 'input' );
-					input.setAttribute( 'type', 'range' );
-
-					const info = settings.nodeValue.replace( /@/g, ':' ).split( ':' ).map( v => parseFloat( v ) );
-					while ( info.length < 3 ) info.push( info[ 0 ] );
-					const attributes = { id:settings.nodeName, min: info[ 0 ], max: info[ 1 ], value: info[ 2 ] };
-					attributes.step = ( attributes.max - attributes.min ) / 100.;
-
-					for ( const [k,v] of Object.entries( attributes ) ) {
-						input.setAttribute( k, v );
-					}
-
-					const container = document.createElement( 'div' );
-					const label = document.createElement( 'span' );
-					const value = document.createElement( 'span' );
-					label.style.display = 'inline-block';
-					value.style.display = 'inline-block';
-					label.style.width = '4em';
-					value.style.width = '4em';
-
-					label.appendChild( document.createTextNode( attributes.id ) );
-					value.appendChild( document.createTextNode( attributes.value ) );
-
-					container.appendChild( label );
-					container.appendChild( value );
-					container.appendChild( input );
-
-					range.appendChild( container );
-
-					uniforms[ attributes.id ] = () => attributes.value;
-
-					input.addEventListener( 'input', () => {
-						value.innerHTML = attributes.value = parseFloat( input.value );
-					});
-				}
-
-				return uniforms;
-			};
 
 			window.addEventListener('load', () => {
-				const config = { uniforms: ranger() };
-				let timer = 0;
-				config.uniforms.u_time = () => timer += 0.001;
+				const config = { uniforms: ShadyLadyUtil.createRanges({
+				},ShadyLadyUtil.firstTag('ranges'))};
+
 				const shadyLady = new ShadyLady( config );
 			});
 
 	   	</SCRIPT>
 	</HEAD>
 	<BODY>
-		<range u_mod="0:1:.11"></range>
-		<range u_minus="-1:1:.0"></range>
-
-		<range u_min="0:.2:.05"></range>
-		<range u_max="0:.2:.0"></range>
-		<range u_add="-1:1:0"></range>
-		<range u_sux="-1:1:1"></range>
-
-		<range u_min2="0:.2:.04"></range>
-		<range u_max2="0:.2:.0"></range>
-		<range u_add2="-1:1:0"></range>
-		<range u_sux2="-1:1:1"></range>
-
-		<range u_aaa=".01:.13:.0940"></range>
-		<range u_bbb=".01:.13:.0520"></range>
-<!--
-		<range u_mod="0:.1@.031"/>
-		<range u_min="0:.1@.081"/>
-		<range u_max="0:.1@.028"/>
-		<range u_add="0:.1@.040"/>
-		<range u_minus="0:1@.040"/>
--->
+		<ranges></ranges>
 		<SHADY>
 			#include es300-boilerplate.frag
 			#include uniforms.frag
 
-			uniform float u_mod;
-			uniform float u_minus;
+			float circle( vec2 uv, float moddo ) {
+				float q = .11;
+				float t = mod( .1 * iTime, 1000. * moddo );
 
-			uniform float u_time;
+				float w = mod( length( uv ) - t, moddo );
+				return 1. - smoothstep( .0940, .0520, w );
+			}
 
-			uniform float u_min;
-			uniform float u_max;
-			uniform float u_add;
-			uniform float u_sux;
+			//https://www.shadertoy.com/view/7slGDN
+			#define FBI(k) floatBitsToInt(dot(k,k))^floatBitsToInt(k)
 
-			uniform float u_min2;
-			uniform float u_max2;
-			uniform float u_add2;
-			uniform float u_sux2;
+			float hash(vec2 p) {
+				ivec2 q = FBI( p );
+				return float( q * q * q ) / 2.14e9;
+			}
 
-			uniform float u_aaa;
-			uniform float u_bbb;
-			
+			vec2 hash2(vec2 p ) {
+				return fract( vec2( 
+					hash( p + vec2( .3183099, .3678794 ) ),
+					hash( p + vec2( .1357911, .6384210 ) )
+				));
+			}
+
+			vec2 hash22( in vec2 uv ) {
+				vec3 q = fract( uv.xyx * vec3( 19.191, 53.733, 73.761 ) );
+				q += dot( q, q + vec3( 41.557, 23.929, 37.983 ) );
+				return fract( vec2( q.x * q.y, q.y * q.z ) );
+			}
+
+			float voronoiDistance( vec2 st, vec2 id, vec2 neighbor ) {
+				vec2 pt = hash2( id + neighbor );
+				st -= pt + neighbor;
+				return dot( st, st );
+			}
+
+			/* returns {x:distance,yz:neighborId} */
+			vec3 voronoiWhich( vec2 uv, float scale ) {
+				uv *= scale;
+				vec2 id = floor( uv );
+				uv -= id;
+
+				vec3 n;
+				vec3 d = vec3( 1e33 );
+n.yz = vec2( -1., -1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+n.yz = vec2( -1., .0  ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+n.yz = vec2( -1., +1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+
+n.yz = vec2( .0,  -1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+n.yz = vec2( .0,  .0  ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+n.yz = vec2( .0,  +1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+
+n.yz = vec2( +1., -1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+n.yz = vec2( +1., .0  ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+n.yz = vec2( +1., +1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+
+				d.yz += id;
+
+				return d;
+			}
+
+			float voronoi( vec2 uv, float scale ) {
+				uv *= scale;
+				vec2 st = fract( uv );
+				vec2 id = floor( uv );
+
+				float s = sqrt( 2. );
+
+				float d = 1e33;
+
+				d = min( d, voronoiDistance( st, id, vec2(  .0, .0 ) ) );
+
+				d = min( d, voronoiDistance( st, id, vec2( +1., .0 ) ) );
+				d = min( d, voronoiDistance( st, id, vec2( -1., .0 ) ) );
+				d = min( d, voronoiDistance( st, id, vec2( .0, +1. ) ) );
+				d = min( d, voronoiDistance( st, id, vec2( .0, -1. ) ) );
+
+				d = min( d, voronoiDistance( st, id, vec2( +1., +1. ) ) );
+				d = min( d, voronoiDistance( st, id, vec2( -1., -1. ) ) );
+				d = min( d, voronoiDistance( st, id, vec2( -1., +1. ) ) );
+				d = min( d, voronoiDistance( st, id, vec2( +1., -1. ) ) );
+
+				return sqrt( d * scale * .1 );
+			}
+
 			void main() {
 				vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
 
-				float q = .11;
-				float w = mod( length( uv ) - u_time, q );
-				float h = mod( length( uv ) - u_time - .5 * q, q );
-				fragColor = vec4( vec3( w, h, 0 ), 1. );
-				fragColor = vec4( vec3( w-h ), 1. );
-				fragColor = vec4( vec3( max(w,h) ), 1. );
-				fragColor = vec4( vec3( min(w,h) ), 1. );
-				fragColor = vec4( vec3( w+h ), 1. );
+				float c = circle( uv, .11 );
 
-				float f = smoothstep( u_aaa, u_bbb, w );//+h );
-				f = 1. -f;
-				fragColor = vec4( vec3( f ), 1. );
+				float v = voronoi( uv, 10. );
+				vec3 v3 = voronoiWhich( uv, 10. );
+				vec3 vq = voronoiWhich( uv + c * .7, 10. );
 
 
-				return;
+				fragColor = vec4( vec3( v - c ), 1. );
+				fragColor = vec4( vec3( c - v ), 1. );
+				fragColor = vec4( c, v, v * c, 1. );
 
-			//	float m = mod( dot( uv, uv ) - u_minus - u_time, u_mod );
-				float m = mod( dot( uv, uv ) - .0 - u_time, u_mod );
+				fragColor = vec4( abs( v3.xyz ) * v3.x * c, 1. );
+				fragColor = vec4( abs( v3.xyz ) * v3.x + c, 1. );
+				fragColor = vec4( abs( v3.xyz ) * c, 1. );
 
-				float r = u_sux * smoothstep( u_min, u_max, m + u_add ) ;
+				vec2 ug = fract( abs( v3.yz * .1 ) );
+				fragColor = vec4( ug.xyx * c, 1. );
 
-				float m2 = mod( u_minus - dot( uv, uv ) - u_time, u_mod );
-				float g = u_sux2 * smoothstep( u_min2, u_max2, m2 + u_add2 );
+				vec2 uk = fract( abs( vq.yz * .1 ) );
+				fragColor = vec4( uk.xyx * c, 1. );
+				fragColor = vec4( uk.xyx * c - ug.xyx * c, 1. );
 
-				//r += g;
-
-				fragColor = vec4( vec3( r, g, .0 ), 1. );
-				fragColor = vec4( vec3( r+g ), 1. );
+				float o = circle( uv + v3.yz, .15 );
+				fragColor = vec4( vec3( o, o, o ) * uk.x, 1. );
 			}
 		</SHADY>
 	</BODY>
