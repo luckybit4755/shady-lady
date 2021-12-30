@@ -5,6 +5,7 @@
 		<!-- 
 		https://www.youtube.com/watch?v=nT_Oaz1fSEc
 		https://www.youtube.com/watch?v=_bdcQXMQ4e0
+		https://www.iquilezles.org/www/articles/terrainmarching/terrainmarching.htm
 		-->
 
 		<SCRIPT TYPE="text/javascript" SRC="../js/throw-shade.js"></SCRIPT>
@@ -14,7 +15,12 @@
 			window.addEventListener('load', () => {
 				const config = { uniforms: ShadyLadyUtil.createRanges({
 					u1:'0,1,.04',
-					u2:'0,1,.12'
+					u2:'0,1,.12',
+					vv:'1,33,14',
+					sp:'.01,.1,.04',
+					s1:'.01,.13,.0940',
+					s2:'.01,.13,.0520',
+					dd:'1,17,2.12',
 				},ShadyLadyUtil.firstTag('ranges'))};
 
 				const shadyLady = new ShadyLady( config );
@@ -28,14 +34,13 @@
 			#include es300-boilerplate.frag
 			#include uniforms.frag
 
-			uniform float u1, u2;
+			uniform float u1, u2, vv, sp, s1, s2, dd;
 
 			float circle( vec2 uv, float moddo ) {
-				float q = .11;
-				float t = mod( .05 * iTime, 1000. * moddo );
+				float t = mod( sp * iTime, 1000. * moddo );
 
 				float w = mod( length( uv ) - t, moddo );
-				return 1. - smoothstep( .0940, .0520, w );
+				return 1. - smoothstep( s1, s2, w );//.0940, .0520, w );
 			}
 
 			//https://www.shadertoy.com/view/7slGDN
@@ -59,10 +64,16 @@
 				return fract( vec2( q.x * q.y, q.y * q.z ) );
 			}
 
-			float voronoiDistance( vec2 st, vec2 id, vec2 neighbor ) {
+			vec3 voronoiClosest( vec3 current, vec2 st, vec2 id, vec2 neighbor ) {
 				vec2 pt = hash2( id + neighbor );
 				st -= pt + neighbor;
-				return dot( st, st );
+				float v = dot( st, st );
+
+				// trying to avoid the if ... :-/
+				float p = step( current.x, v );
+				return ( p * current ) + ( ( 1. - p ) * vec3( v, neighbor ) );
+
+				return ( current.x < v ) ? current : vec3( v, neighbor );
 			}
 
 			/* returns {x:distance,yz:neighborId} */
@@ -71,84 +82,123 @@
 				vec2 id = floor( uv );
 				uv -= id;
 
-				vec3 n;
-				vec3 d = vec3( 1e33 );
-n.yz = vec2( -1., -1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
-n.yz = vec2( -1., .0  ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
-n.yz = vec2( -1., +1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+				vec3 current = vec3( 1e33 );
 
-n.yz = vec2( .0,  -1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
-n.yz = vec2( .0,  .0  ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
-n.yz = vec2( .0,  +1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+				current = voronoiClosest( current, uv, id, vec2( -1., -1. ) );
+				current = voronoiClosest( current, uv, id, vec2( -1., -0. ) );
+				current = voronoiClosest( current, uv, id, vec2( -1., +1. ) );
 
-n.yz = vec2( +1., -1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
-n.yz = vec2( +1., .0  ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
-n.yz = vec2( +1., +1. ); n.x = voronoiDistance( uv, id, n.yz ); if ( n.x < d.x ) d = n;
+				current = voronoiClosest( current, uv, id, vec2( -0., -1. ) );
+				current = voronoiClosest( current, uv, id, vec2( -0., -0. ) );
+				current = voronoiClosest( current, uv, id, vec2( -0., +1. ) );
 
-				d.yz += id;
+				current = voronoiClosest( current, uv, id, vec2( +1., -1. ) );
+				current = voronoiClosest( current, uv, id, vec2( +1., -0. ) );
+				current = voronoiClosest( current, uv, id, vec2( +1., +1. ) );
 
-				return d;
+				current.yz += id;
+
+				return current;
 			}
 
-			float voronoi( vec2 uv, float scale ) {
-				uv *= scale;
-				vec2 st = fract( uv );
-				vec2 id = floor( uv );
+			float voronoiCircle( vec2 uv ) {
+				vec3 v3 = voronoiWhich( uv, vv ); // vv = 14 is good
+				float c = circle( v3.yz * u1, u2 ); // u1 = .04, u2 = .12 is nice :-)
 
-				float s = sqrt( 2. );
-
-				float d = 1e33;
-
-				d = min( d, voronoiDistance( st, id, vec2(  .0, .0 ) ) );
-
-				d = min( d, voronoiDistance( st, id, vec2( +1., .0 ) ) );
-				d = min( d, voronoiDistance( st, id, vec2( -1., .0 ) ) );
-				d = min( d, voronoiDistance( st, id, vec2( .0, +1. ) ) );
-				d = min( d, voronoiDistance( st, id, vec2( .0, -1. ) ) );
-
-				d = min( d, voronoiDistance( st, id, vec2( +1., +1. ) ) );
-				d = min( d, voronoiDistance( st, id, vec2( -1., -1. ) ) );
-				d = min( d, voronoiDistance( st, id, vec2( -1., +1. ) ) );
-				d = min( d, voronoiDistance( st, id, vec2( +1., -1. ) ) );
-
-				return sqrt( d * scale * .1 );
+				//float d = 1. - sqrt(dot( uv, uv )) * dd;// 2.;
+				float d = 1. - pow( length( uv ), 1. / dd );
+				return d * c;
 			}
+
+			// terrain casting 
+			#include raymarching/make-camera.glsl
+
+			float map( vec3 p ) {
+				// make things blockier:
+				float m = .077;
+				vec3 q = floor( p / m ) * m;
+           		float h = voronoiCircle( q.xz );
+
+				// height
+				if ( h < .02 ) h = .0;
+
+				return h;
+        	}
+
+			vec4 mapTerrain( vec3 eye, vec3 direction, float maxDistance ) {
+				vec3 p = eye;
+				for( float t = .0 ; t < maxDistance ; t += .01 ) {
+					float h = map( p );
+
+
+					if ( p.y < h ) {
+						return vec4( p, t );
+					}
+					p = eye + direction * t;
+				}
+
+				return vec4( 2021.2022 );
+			}
+
+			vec4 terrainCaster( vec2 uv, float maxDistance ) {
+				float d = .0;
+
+				float cameraDistance = 2.;
+				float angleF = 1.33;
+				float angleX = iMouse.x * angleF;
+				float angleY = iMouse.y * angleF;
+				if ( .0 > iMouse.z ) {
+					angleX = .0;
+					angleY = .77;
+				}
+
+				vec3 eye = vec3( cameraDistance * sin( angleX ) , cameraDistance * sin( angleY ),  cameraDistance * cos( angleX ) );
+    			vec3 target = vec3( 0 );
+    			vec3 direction = normalize( makeCamera( eye, target, .0 ) * vec3( uv, 1. ) );
+
+				return mapTerrain( eye, direction, maxDistance );
+			}
+
+			// https://www.iquilezles.org/www/articles/terrainmarching/terrainmarching.htm
+            vec3 terrainNormal( vec3 p ) {
+                vec2 q = p.xz;
+                vec2 ips = vec2( .01, .0 );
+                return normalize(
+                    vec3(
+                        voronoiCircle(q - ips.xy ) - voronoiCircle( q +ips.xy ),
+                        2.0f*ips.x,
+                        voronoiCircle(q-ips.yx) - voronoiCircle(q+ips.yx)
+                    )
+                );
+            }
 
 			void main() {
 				vec2 uv = ( gl_FragCoord.xy - .5 * iResolution.xy ) / iResolution.y;
 
-				float c = circle( uv, .11 );
+				float vc = voronoiCircle( uv );
 
-				float v = voronoi( uv, 10. );
-				vec3 v3 = voronoiWhich( uv, 10. );
-				vec3 vq = voronoiWhich( uv + c * .7, 10. );
+				//fragColor = vec4( vec3( vc ), 1. ); return;
 
+				fragColor = .11 * vec4( vec3( vc ), 1. );
 
-				fragColor = vec4( vec3( v - c ), 1. );
-				fragColor = vec4( vec3( c - v ), 1. );
-				fragColor = vec4( c, v, v * c, 1. );
+				float maxDistance = 33.;
+				vec4 at = terrainCaster( uv, maxDistance );
+				if ( at.z < maxDistance ) {
+					float fog = at.z / maxDistance;
 
-				fragColor = vec4( abs( v3.xyz ) * v3.x * c, 1. );
-				fragColor = vec4( abs( v3.xyz ) * v3.x + c, 1. );
-				fragColor = vec4( abs( v3.xyz ) * c, 1. );
+					vec3 n = terrainNormal( at.xyz );
+					vec3 color = (
+						+ .4 * abs( at.xyz ) 
+						+ .7 * fog
+						+ .4 * vec3( n.x * .3, n.y * .4, n.z * .3 )
+					);
 
-				vec2 ug = fract( abs( v3.yz * .1 ) );
-				fragColor = vec4( ug.xyx * c, 1. );
+					color = mix( color, vec3( .3 ), fog );
 
-				vec2 uk = fract( abs( vq.yz * .1 ) );
-				fragColor = vec4( uk.xyx * c, 1. );
-				fragColor = vec4( uk.xyx * c - ug.xyx * c, 1. );
-
-				float o = circle( uv + v3.yz, .15 );
-				fragColor = vec4( vec3( o ) * uk.x, 1. );
-
-				float rl = 1.-pow(dot( uv,uv ),.3);
-				fragColor = vec4( vec3( rl ) , 1. );
-				fragColor = vec4( rl * vec3( o ), 1. );
-
-
-				float p = circle( v3.yz * u1, u2 );
-				fragColor = vec4( vec3( p ), 1. );
+					fragColor = vec4( color, 1. );
+				} else {
+					fragColor = vec4( vec3( .8), 1. );
+				}
 			}
 		</SHADY>
 	</BODY>
