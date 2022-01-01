@@ -22,7 +22,7 @@
 						circle1:'.01,.13,.0940',
 						circle2:'.01,.13,.0520',
 						dropoff:'.5,17,2.12',
-						blocky:'.01,.5,.077',
+						blocky:'.010,.099,.052',
 						pixelate:'.0,.07,.0',
 						downer:'.01,1.3,1.',
 						spread:'0,1,.66',
@@ -40,6 +40,10 @@
 		<SHADY>
 			#include es300-boilerplate.frag
 			#include uniforms.frag
+			#include random/hash.glsl
+			#include mapping/voronoi.glsl
+			#include functions/fragCoordToUv.glsl
+			#include mapping/terrainCaster.glsl
 
 			uniform float cScale, cSize, vScale, speed, circle1, circle2, dropoff, blocky, pixelate, downer, spread, flatt;
 
@@ -50,193 +54,81 @@
 				return 1. - smoothstep( circle1, circle2, w );//.0940, .0520, w );
 			}
 
-			//https://www.shadertoy.com/view/7slGDN
-			vec2 hash( in vec2 uv ) {
-				vec3 q = fract( uv.xyx * vec3( 19.191, 53.733, 73.761 ) );
-				q += dot( q, q + vec3( 41.557, 23.929, 37.983 ) );
-				return fract( vec2( q.x * q.y, q.y * q.z ) );
-			}
-
-			/* returns {x:distance,yz:neighborId} */
-			vec3 voronoiClosest( vec3 current, vec2 st, vec2 id, vec2 neighbor ) {
-				vec2 point = hash( id + neighbor );
-				st -= point + neighbor;
-				float v = dot( st, st );
-
-				// trying to avoid the if ... :-/
-				//float p = step( current.x, v );
-				//return ( p * current ) + ( ( 1. - p ) * vec3( v, neighbor ) );
-
-				return ( current.x < v ) ? current : vec3( v, neighbor );
-			}
-
-			/* returns {x:distance,yz:closestId} */
-			vec3 voronoiWhich( vec2 uv, float scale ) {
-				uv *= scale;
-				vec2 id = floor( uv );
-				uv -= id;
-
-				vec3 current = vec3( 1e33 );
-
-				current = voronoiClosest( current, uv, id, vec2( -1., -1. ) );
-				current = voronoiClosest( current, uv, id, vec2( -1., -0. ) );
-				current = voronoiClosest( current, uv, id, vec2( -1., +1. ) );
-
-				current = voronoiClosest( current, uv, id, vec2( -0., -1. ) );
-				current = voronoiClosest( current, uv, id, vec2( -0., -0. ) );
-				current = voronoiClosest( current, uv, id, vec2( -0., +1. ) );
-
-				current = voronoiClosest( current, uv, id, vec2( +1., -1. ) );
-				current = voronoiClosest( current, uv, id, vec2( +1., -0. ) );
-				current = voronoiClosest( current, uv, id, vec2( +1., +1. ) );
-
-				current.x = sqrt( current.x );
-				current.yz += id;
-
-				return current;
-			}
+			struct VoronoiCircleMapping {
+				vec2 id;
+				float distance;
+				float circle;
+			};
 
 			// the break thru was using the voronoi as a map into the circle generator
-			// return {x:vDistance,yz:vId,w:circleValue]
-			vec4 voronoiCircle( vec2 uv ) {
-				vec3 v3 = voronoiWhich( uv, vScale ); // vScale = 14 is good
-				float c = circle( v3.yz * cScale, cSize ); // cScale = .04, cSize = .12 is nice :-)
+			VoronoiCircleMapping voronoiCircle( vec2 uv ) {
+				VoroniMapping v = mapVoronoi( uv, vScale ); // vScale = 14 is good
+				float c = circle( v.id * cScale, cSize ); // cScale = .04, cSize = .12 is nice :-)
 				float d = 1. - pow( length( uv ), 1. / dropoff );
-				return vec4( v3, d * c * .77 );
+				float k = c * d * .77;
+				return VoronoiCircleMapping( v.id, v.distance, k );
 			}
-
-			#include raymarching/make-camera.glsl
 
 			float map( vec3 p ) {
 				vec3 q = floor( p / blocky ) * blocky;
-		
-				vec4 vc = voronoiCircle( q.xz );
-				if ( vc.x > spread ) return .0;
+	
+				VoronoiCircleMapping v = voronoiCircle( q.xz );
+				if ( v.distance > spread ) return .0;
 				
-           		float h = vc.w * downer;
-
+           		float h = v.circle * downer;
 				//h = floor( h / blocky ) * blocky;
 
 				// cutoff...
-				if ( h < .177 ) h = .0;
+				//if ( h < .177 ) h = .0;
 
 				return h;
         	}
 
-			// terrain casting 
-			vec4 mapTerrain( vec3 eye, vec3 direction, float maxDistance ) {
-				vec3 p = eye;
-				float inc = .01;
-				float ink = .001;//inc * .05;
-				for( float t = .0 ; t < maxDistance ; t += inc ) {
-					float h = map( p );
-					if ( p.y < h + ink ) {
-			#if 1
-						// backup and move forward slower
-						for ( float s = t - inc ; s < t ; s += ink ) {
-							p = eye + direction * s;
-							h = map( p );
-							if ( p.y < h + ink ) break;
-						}
-			#endif
-						return vec4( p, t );
-					}
-					p = eye + direction * t;
-				}
-
-				return vec4( 2021.2022 );
-			}
-
-			vec4 terrainCaster( vec2 uv, float maxDistance ) {
-				float d = .0;
-
-				float cameraDistance = 1.;
-				float angleF = 1.33;
-				float angleX = iMouse.x * angleF;
-				float angleY = iMouse.y * angleF + .77;
-				if ( .0 > iMouse.z ) {
-					angleX = .0;
-					angleY = .77;
-				}
-
-				angleY = max( .033, angleY );
-
-				vec3 eye = vec3( cameraDistance * sin( angleX ) , cameraDistance * sin( angleY ),  cameraDistance * cos( angleX ) );
-    			vec3 target = vec3( 0 );
-    			vec3 direction = normalize( makeCamera( eye, target, .0 ) * vec3( uv, 1. ) );
-
-				return mapTerrain( eye, direction, maxDistance );
-			}
-
-			// https://www.iquilezles.org/www/articles/terrainmarching/terrainmarching.htm
-            vec3 terrainNormal( vec3 p ) {
-                vec2 q = p.xz;
-                vec2 ips = vec2( .01, .0 );
-                return normalize(
-                    vec3(
-                        voronoiCircle(q - ips.xy ).w - voronoiCircle( q +ips.xy ).w,
-                        2.0f*ips.x,
-                        voronoiCircle(q-ips.yx).w - voronoiCircle(q+ips.yx).w
-                    )
-                );
-            }
-
-			#define UNIT(txt) ( txt * 2. - iResolution.xy ) / iResolution.y
-
 			void main() {
-				vec2 uv = ( gl_FragCoord.xy * 2. - iResolution.xy ) / iResolution.y;
+				vec2 uv = fragCoordToUv();
 
 				if ( .0 != pixelate ) {
 					uv = floor( uv / pixelate ) * pixelate;
 				}
 
 				if ( flatt > .5 ) {
-					vec4 voronoid = voronoiCircle( uv );
-					float vc = voronoid.w;
-					fragColor = vec4( vec3( vc ), 1. ); 
+					VoronoiCircleMapping v = voronoiCircle( uv );
+					fragColor = vec4( vec3( v.circle ), 1. ); 
 					return;
 				}
 
 				float maxDistance = 22.;
-				vec4 at = terrainCaster( uv, maxDistance );
+				float inc = .01;
+
+				vec4 at = terrainCaster( uv, maxDistance, inc, 1. );
+
 				if ( at.z < maxDistance ) {
 					float fog = at.z / maxDistance;
 
-					// {x:vDistance,yz:vId,w:circleValue]
-					vec4 vvv = voronoiCircle( at.xz );
+					VoronoiCircleMapping v = voronoiCircle( at.xz );
 
 					vec3 normal = terrainNormal( at.xyz );
 					float lighting = abs( dot( vec3( .3, .4, .3 ), normal ) );
-					float intense = smoothstep( .3, .5, lighting );
+					float intense = .25 + smoothstep( .3, .5, lighting );
 
 					// fun stuff to play around with endlessly :-P
 
-					vec3 color = (
-						+ .0 * abs( at.xyz ) 
-						+ .0 * abs(vvv.xxx)
-						+ .0 * abs(vvv.xyz * .1)
-						//+ .9 * (1.-fog) ///* vvv.w
-						//* (.9 + abs(dot( vec3( .3, .4, .3 ), normal )))
-						//+ .4 * dot( vec3( .3, .4, .3 ), normal )
-						//+ .4
-						//+ abs( dot( vec3( .3, .4, .3 ), normal ) )
-						+ .2 * vec3( fog, vvv.x * .5, ( abs( vvv.y ) + abs( vvv.z ) ) * .01 )
-						+ .5 * lighting
-						+ .5 * intense
-					);
-/*
-					float id = mod( abs(vvv.y) + abs( vvv.z ), 4. );
-					if ( id < 0.) color = vec3( .6 ); else
-					if ( id < 1.) color = vec3( .70,.15,.00 ); else
-					if ( id < 2.) color = vec3( .00, .15,.70 ); else
-					if ( id < 3.) color = vec3( .15, .00, .70 ); else
-*/
+					vec2 id = abs( v.id );
+					vec3 q1 = vec3( fog, .5 * v.distance, .1 * ( id.x + id.y ) );
 
-					color = mix( color, vec3( .7 ), fog );
+					vec3 color = intense * vec3( .5 + v.circle );
+
+					//color = mix( color, vec3( .7 ), fog );
 
 					fragColor = vec4( color, 1. );
 				} else {
-					fragColor = vec4( vec3( .7, .15, .0 ), 1. );
+					vec2 st = uv + cos( iTime * .1 ) * 3.3;
+					float c = (
+						+ .6 * mapVoronoi( st, 4. ).distance
+						+ .3 * mapVoronoi( st, 8. ).distance
+						+ .1 * mapVoronoi( st, 24. ).distance
+					);
+					fragColor = vec4( c  * vec3( .7, .15, .0 ), 1. );
 				}
 			}
 		</SHADY>
