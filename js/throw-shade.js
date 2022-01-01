@@ -25,6 +25,7 @@ class ShadyLady {
 			width:640, 
 			height:480,
 			fps: 50,
+			fpsAt: 100, /* how often to report fps info */
 			reload:false,
 			logLevel:ShadyLadyLogger.DEBUG,
 			uniforms: {
@@ -574,8 +575,32 @@ class ShadyLady {
 	}
 
 	updateTimer() {
-		this.controls.currentTime = ShadyLadyUtil.now() - this.controls.startTime;
+		const now = ShadyLadyUtil.now();
+		this.controls.currentTime = now - this.controls.startTime;
 		this.controls.frameCount++;
+
+        if ( 0 === this.controls.frameCount % this.config.fpsAt ) {
+			this.fpsInfo();
+		}
+	}
+
+	fpsInfo() {
+		const now = this.controls.startTime + this.controls.currentTime;
+
+		const fps = ShadyLadyUtil.precision( 
+			this.controls.frameCount / this.controls.currentTime 
+		);
+		const message = ['fps; cumulative:', fps];
+
+		if ( this.controls.lastFpsAt ) {
+			const lfps = ShadyLadyUtil.precision(
+				this.config.fpsAt / ( now - this.controls.lastFpsAt )
+			);
+			message.push( ', recent: ', + lfps );
+		}
+		this.controls.lastFpsAt = now;
+
+		this.logger.info( message.join( ' ' ) );
 	}
 
 	frame() {
@@ -867,6 +892,13 @@ class ShadyLadyUtil {
 
 	static isUndefined( f ) {
 		return ( 'undefined' === typeof( f ) );
+	}
+
+	static precision( f, decimalPlaces = 3 ) {
+		let s = f + '';
+		if ( -1 == s.indexOf( '.' ) ) s += '.';
+		s += '0000000000000';
+		return s.substring( 0, s.indexOf( '.' ) + 1 + decimalPlaces );
 	}
 
 	static hashText = ( txt ) => {
